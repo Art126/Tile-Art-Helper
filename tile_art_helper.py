@@ -1,51 +1,278 @@
-## Tile Art Helper v0.2.1
+## Tile Art Helper v0.3.0
 ## Author: Alexander Art
 
 import pygame, tkinter, math
 from tkinter import filedialog
 
-print("INSTRUCTIONS:")
-print("Open an image file")
-print("Left click to paint")
-print("Middle click to use a color picker at the mouse position")
-print("Right click and drag to pan")
-print("Scroll to zoom")
-print("Use the on-screen controls for everything else")
-
-pygame.init()
-pygame.display.set_caption('Tile Art Helper')
-display = pygame.display.set_mode((640, 360), pygame.SCALED)
-
 # Class for panel UIs
 class Panel:
-    def __init__(self, rect):
+    # If a panel is not fixed, it will have a title bar drawn above it so that it can be dragged around.
+    title_bar_height = 10
+    
+    def __init__(self, rect, fixed, bgcolor=(127, 63, 0)):
+        # Panels can either be rendered on a pygame surface directly or can be children of other panels.
+        
+        # Create rect object from rect argument.
         rect = pygame.Rect(rect)
+
+        # Create the panel surface.
+        # Once created, the panel size is fixed. (Consider changing this in future versions!)
         self.surface = pygame.Surface(rect.size)
+
+        # Position of the panel relative to the top left corner of its parent.
         self.x = rect.x
         self.y = rect.y
+
+        # True if the panel should be fixed and not have a title bar.
+        # False if the panel should have a title bar and be movable.
+        self.fixed = fixed
+
+        # Can be set with .set_caption()
+        self.title = ""
+
+        # If the panel is movable, this keeps track of when it is being moved.
+        self.title_bar_held = False
+
+        # Background color of the panel.
+        # TODO: Implement color schemes.
+        self.bgcolor = bgcolor
+
+        # Panels, canvases, buttons, and text may be added as child objects.
+        self.panels = []
+        self.canvases = [] # Needing several canvases is rare.
         self.buttons = []
         self.text = []
 
+    def get_bounding_rect(self):
+        if self.fixed:
+            return pygame.Rect(self.x, self.y, self.surface.get_width(), self.surface.get_height())
+        else:
+            return pygame.Rect(self.x, self.y - self.title_bar_height, self.surface.get_width(), self.surface.get_height() + self.title_bar_height)
+
+    def get_title_bar_rect(self):
+        return pygame.Rect(self.x, self.y - self.title_bar_height, self.surface.get_width(), self.title_bar_height)
+
+    def set_caption(self, caption):
+        self.title = caption
+        return self
+            
+    def add_panel(self, panel):
+        self.panels.append(panel)
+        return self
+
+    def add_canvas(self, canvas):
+        self.canvases.append(canvas)
+        return self
+
     def add_button(self, button):
         self.buttons.append(button)
+        return self
 
     def add_text(self, text):
         self.text.append(text)
+        return self
 
     def render(self, surface, mouse_pos):
-        self.surface.fill((127, 63, 0))
-        
+        # Passed mouse_pos argument should be relative to the top left corner of the surface or panel that this panel is rendered on.
+
+        # Clear panel surface
+        self.surface.fill(self.bgcolor)
+
+        # If this panel is not fixed, draw the tittle bar and its caption
+        if not self.fixed:
+            pygame.draw.rect(surface, (255, 255, 255), (self.x, self.y - 10, self.surface.get_width(), 10))
+            surface.blit(pygame.font.Font(None, 12).render(self.title, True, (0, 0, 0)), (self.x + 2, self.y - 9))
+
+        # Render child canvases
+        for canvas in self.canvases:
+            canvas.render(self.surface)
+
+        # Render child panels
+        for panel in self.panels:
+            panel.render(self.surface, (mouse_pos[0] - self.x, mouse_pos[1] - self.y))
+
+        # Render child buttons
         for button in self.buttons:
             button.render(self.surface, (mouse_pos[0] - self.x, mouse_pos[1] - self.y))
             
+        # Render child text
         for text in self.text:
             text.render(self.surface)
 
+        # Blit the panel surface (self.surface) onto the given surface (surface)
         surface.blit(self.surface, (self.x, self.y))
 
+    def mouse_moved(self, mouse_pos, mouse_rel):
+        # This function runs every frame the mouse moves.
+
+        # If the panel is being dragged, make it follow the mouse
+        if self.title_bar_held:
+            self.x += mouse_rel[0]
+            self.y += mouse_rel[1]
+
+        # Pass mouse move to child panels
+        for panel in self.panels:
+            panel.mouse_moved((mouse_pos[0] - self.x, mouse_pos[1] - self.y), mouse_rel)
+
     def left_mouse_down(self, mouse_pos):
+        # This function runs on the left mousedown event.
+        # Passed mouse_pos argument should be relative to the top left corner of the surface or panel that this panel is rendered on.
+
+        # Detect when title bar is visible and is pressed
+        if not self.fixed:
+            if self.get_title_bar_rect().collidepoint(mouse_pos):
+                self.title_bar_held = True
+
+        # Pass mouse press to child panels
+        for panel in self.panels:
+            panel.left_mouse_down((mouse_pos[0] - self.x, mouse_pos[1] - self.y))
+
+        # Pass mouse press to child buttons
         for button in self.buttons:
             button.left_mouse_down((mouse_pos[0] - self.x, mouse_pos[1] - self.y))
+
+    def left_mouse_pressed(self, mouse_pos):
+        # This function runs every frame the left mouse button is down.
+        # Passed mouse_pos argument should be relative to the top left corner of the surface or panel that this panel is rendered on.
+
+        # Child panels cover child canvases and can block them from being pressed
+        for panel in self.panels:
+            # Detect overlap
+            if panel.get_bounding_rect().collidepoint(mouse_pos):
+                break
+        else:
+            # Only runs if no child panels were pressed
+            # Pass mouse press to child canvases
+            for canvas in self.canvases:
+                canvas.left_mouse_pressed((mouse_pos[0] - self.x, mouse_pos[1] - self.y))
+
+    def left_mouse_up(self, mouse_pos):
+        # This function runs on the left mouseup event.
+        
+        self.title_bar_held = False
+
+        # Pass mouse move to child panels
+        for panel in self.panels:
+            panel.left_mouse_up((mouse_pos[0] - self.x, mouse_pos[1] - self.y))
+
+# Class for canvas UI element
+class Canvas:
+    def __init__(self, rect):
+        # Canvases can either be rendered on a pygame surface directly or can be children of panels.
+        # The canvas having any local position other than (0, 0) is not yet supported.
+
+        # Create rect object from rect argument.
+        rect = pygame.Rect(rect)
+
+        # Create the panel surface.
+        # Once created, the canvas size is fixed. (Consider changing this in future versions!)
+        self.surface = pygame.Surface(rect.size)
+
+        # Position of the canvas relative to the top left corner of its parent.
+        self.x = rect.x
+        self.y = rect.y
+
+        self.zoom = 1 # zoom < 1 means zoomed out. zoom > 1 means zoomed in.
+        self.scroll = [0, 0]
+
+        self.loaded_image = None
+        self.open_filepath = None
+        self.image_loaded = False
+
+    def get_bounding_rect(self):
+        return pygame.Rect(self.x, self.y, self.surface.get_width(), self.surface.get_height())
+
+    def get_coords_text(self):
+        # Returns the coordinates of the mouse position on the canvas as text.
+        # This assumes that the canvas is at (0, 0). Temporary solution!
+        if self.image_loaded:
+            pos_x = int((pygame.mouse.get_pos()[0] - self.scroll[0]) % (math.floor(self.loaded_image.get_width() * self.zoom)) / self.zoom)
+            pos_y = int((pygame.mouse.get_pos()[1] - self.scroll[1]) % (math.floor(self.loaded_image.get_height() * self.zoom)) / self.zoom)
+            return f"Mouse position: ({pos_x}, {pos_y})"
+        else:
+            return "No image loaded"
+
+    def get_zoom_text(self):
+        # Used by text objects to stay updated with the zoom level even as the self.zoom variable changes.
+        return "Zoom: " + str(round(self.zoom * 100)) + "%"
+
+    def increment_zoom(self):
+        self.zoom += 0.1
+        self.zoom = min(20, self.zoom)
+
+    def decrement_zoom(self):
+        self.zoom -= 0.1
+        self.zoom = max(0.1, self.zoom)
+
+    def open_file(self):
+        filepath = tkinter.filedialog.askopenfilename()
+        try:
+            self.loaded_image = pygame.image.load(filepath).convert_alpha()
+            self.open_filepath = filepath
+            self.image_loaded = True
+        except FileNotFoundError:
+            print("File not found.")
+        except pygame.error:
+            print("Error with file format.")
+
+    def save_image(self):
+        if self.image_loaded:
+            pygame.image.save(self.loaded_image, self.open_filepath)
+
+    def save_as(self):
+        if self.image_loaded:
+            filepath = filedialog.asksaveasfilename()
+            try:
+                pygame.image.save(self.loaded_image, filepath)
+                self.loaded_image = pygame.image.load(filepath).convert_alpha()
+                self.open_filepath = filepath
+            except pygame.error:
+                print(f"Invalid file format. Try '.png'")
+
+    def render(self, surface):
+        # Render the loaded image
+        if self.image_loaded:
+            # Scale the loaded image to be rendered
+            # This gets laggy when zoomed in due to large image sizes. This should be fixed in future versions.
+            scaled_image = pygame.transform.scale(self.loaded_image, (self.loaded_image.get_width() * self.zoom, self.loaded_image.get_height() * self.zoom))
+
+            # Apply the modulo function to the scroll to make the tiled image rendering appear continuous.
+            self.scroll[0] %= -scaled_image.get_width()
+            self.scroll[1] %= -scaled_image.get_height()
+
+            # Tile and draw the image
+            for y in range(math.ceil(surface.get_height() / self.loaded_image.get_height() / self.zoom) + 2):
+                for x in range(math.ceil(surface.get_width() / self.loaded_image.get_width() / self.zoom) + 2):
+                    surface.blit(scaled_image, (x * math.floor(self.loaded_image.get_width() * self.zoom) + self.scroll[0], y * math.floor(self.loaded_image.get_height() * self.zoom) + self.scroll[1]))
+
+    def left_mouse_pressed(self, mouse_pos):
+        # Passed mouse_pos argument should be relative to the top left corner of the surface or panel that this canvas is rendered on.
+
+        if self.image_loaded:
+            # Paint
+            if brush == 'pixel':
+                pos_x = int((mouse_pos[0] - self.scroll[0]) % (math.floor(self.loaded_image.get_width() * self.zoom)) / self.zoom)
+                pos_y = int((mouse_pos[1] - self.scroll[1]) % (math.floor(self.loaded_image.get_height() * self.zoom)) / self.zoom)
+                self.loaded_image.set_at((pos_x, pos_y), brush_color)
+            elif brush == 'brush':
+                center_pos_x = int((mouse_pos[0] - self.scroll[0]) % (math.floor(self.loaded_image.get_width() * self.zoom)) / self.zoom)
+                center_pos_y = int((mouse_pos[1] - self.scroll[1]) % (math.floor(self.loaded_image.get_height() * self.zoom)) / self.zoom)
+                for dy in range(brush_size * 2 + 1):
+                    for dx in range(brush_size * 2 + 1):
+                        pos_x = (center_pos_x + dx - brush_size) % self.loaded_image.get_width()
+                        pos_y = (center_pos_y + dy - brush_size) % self.loaded_image.get_height()
+                        point_distance = math.dist(mouse_pos, (mouse_pos[0] + dx - brush_size, mouse_pos[1] + dy - brush_size))
+                        if point_distance <= brush_size:
+                            overlay_pixel(self.loaded_image, (pos_x, pos_y), (brush_color[0], brush_color[1], brush_color[2], brush_color[3] * (1 - point_distance / brush_size)))
+            elif brush == 'circle':
+                center_pos_x = int((mouse_pos[0] - self.scroll[0]) % (math.floor(self.loaded_image.get_width() * self.zoom)) / self.zoom)
+                center_pos_y = int((mouse_pos[1] - self.scroll[1]) % (math.floor(self.loaded_image.get_height() * self.zoom)) / self.zoom)
+                for dy in range(brush_size * 2 + 1):
+                    for dx in range(brush_size * 2 + 1):
+                        if math.dist(mouse_pos, (mouse_pos[0] + dx - brush_size, mouse_pos[1] + dy - brush_size)) <= brush_size:
+                            pos_x = (center_pos_x + dx - brush_size) % self.loaded_image.get_width()
+                            pos_y = (center_pos_y + dy - brush_size) % self.loaded_image.get_height()
+                            self.loaded_image.set_at((pos_x, pos_y), brush_color)
 
 # Class for button UI elements
 class Button:
@@ -65,14 +292,24 @@ class Button:
         surface.blit(pygame.font.Font(None, 16).render(self.label, True, (255, 255, 255)), (self.rect.x + 4, self.rect.y + 3))
 
     def left_mouse_down(self, mouse_pos):
+        # Passed mouse_pos argument should be relative to the top left corner of the surface or panel that this button is rendered on.
+
+        # If this button is pressed, run its function.
         if self.rect.collidepoint(mouse_pos):
             self.action()
 
 class Text:
     def __init__(self, message, size, color, pos):
+        # Text string
         self.message = message
+
+        # Font size
         self.size = size
+
+        # Font color
         self.color = color
+
+        # Text position (relative to the surface or panel that the text is rendered on)
         self.pos = pos
 
     def render(self, surface):
@@ -85,33 +322,6 @@ class Text:
         # Render the text
         surface.blit(pygame.font.Font(None, self.size).render(message, True, self.color), self.pos)
 
-def open_file():
-    global loaded_image, open_filepath, image_loaded
-    filepath = tkinter.filedialog.askopenfilename()
-    try:
-        loaded_image = pygame.image.load(filepath).convert_alpha()
-        open_filepath = filepath
-        image_loaded = True
-    except FileNotFoundError:
-        print("File not found.")
-    except pygame.error:
-        print("Error with file format.")
-
-def save_image():
-    if image_loaded:
-        pygame.image.save(loaded_image, open_filepath)
-
-def save_as():
-    if image_loaded:
-        global loaded_image, open_filepath
-        filepath = filedialog.asksaveasfilename()
-        try:
-            pygame.image.save(loaded_image, filepath)
-            loaded_image = pygame.image.load(filepath).convert_alpha()
-            open_filepath = filepath
-        except pygame.error:
-            print(f"Invalid file format. Try '.png'")
-
 # Works with transparency
 def overlay_pixel(image_source, pos, color):
     # Get previous color to overlay
@@ -122,6 +332,9 @@ def overlay_pixel(image_source, pos, color):
 
     # Set the pixel
     image_source.set_at(pos, new_color)
+
+def get_brush_size_text():
+    return str(brush_size)
 
 # Set brush to pixel mode
 def set_brush_pixel():
@@ -147,195 +360,169 @@ def decrease_brush_size():
     brush_size -= 1
     brush_size = max(1, brush_size)
 
-# Used by text to stay updated with the scale even as the variable changes
-def get_zoom_text():
-    return "Zoom: " + str(round(scale * 100)) + "%"
-
-def increment_zoom():
-    global scale
-    scale += 0.1
-    scale = min(20, scale)
-
-def decrement_zoom():
-    global scale
-    scale -= 0.1
-    scale = max(0.1, scale)
-
-# Returns the coordinates of the mouse position on the canvas as text
-def get_coords_text():
-    if image_loaded:
-        pos_x = int((pygame.mouse.get_pos()[0] - scroll[0]) % (math.floor(loaded_image.get_width() * scale)) / scale)
-        pos_y = int((pygame.mouse.get_pos()[1] - scroll[1]) % (math.floor(loaded_image.get_height() * scale)) / scale)
-        return f"Mouse position: ({pos_x}, {pos_y})"
-    else:
-        return "No image loaded"
-
-# Create tools panel
-tools_panel = Panel((10, 10, 200, 120))
-
-# Tools panel save options
-open_image_button = Button((10, 10, 80, 20), open_file, "Open Image")
-tools_panel.add_button(open_image_button)
-save_overwrite_button = Button((10, 40, 80, 20), save_image, "Save")
-tools_panel.add_button(save_overwrite_button)
-save_overwrite_text = Text("Will overwrite previous!", 12, (255, 255, 255), (5, 60))
-tools_panel.add_text(save_overwrite_text)
-save_as_button = Button((10, 80, 80, 20), save_as, "Save As")
-tools_panel.add_button(save_as_button)
-
-# Tools panel brush options
-pixel_button = Button((110, 10, 80, 20), set_brush_pixel, "Pixel")
-tools_panel.add_button(pixel_button)
-brush_button = Button((110, 40, 80, 20), set_brush_brush, "Brush")
-tools_panel.add_button(brush_button)
-circle_button = Button((110, 70, 80, 20), set_brush_circle, "Circle")
-tools_panel.add_button(circle_button)
-
-# Tools panel brush settings
-increase_brush_size_button = Button((170, 95, 20, 20), increase_brush_size, "+")
-tools_panel.add_button(increase_brush_size_button)
-decrease_brush_size_button = Button((110, 95, 20, 20), decrease_brush_size, "-")
-tools_panel.add_button(decrease_brush_size_button)
-
-# Create bottom panel
-bottom_panel = Panel((0, display.get_height() - 15, display.get_width(), 15))
-
-# Bottom panel coordinate text
-coords_text = Text(get_coords_text, 12, (255, 255, 255), (4, 3))
-bottom_panel.add_text(coords_text)
-
-# Bottom panel zoom buttons
-zoom_text = Text(get_zoom_text, 12, (255, 255, 255), (display.get_width() - 80, 3))
-bottom_panel.add_text(zoom_text)
-increment_zoom_button = Button((display.get_width() - 30, 1, 13, 13), increment_zoom, "+")
-bottom_panel.add_button(increment_zoom_button)
-decrement_zoom_button = Button((display.get_width() - 95, 1, 13, 13), decrement_zoom, "-")
-bottom_panel.add_button(decrement_zoom_button)
-
-# Keep track of all panels
-panels = [
-    tools_panel,
-    bottom_panel
-]
-
-scale = 1 # Scale < 1 means zoomed out. Scale > 1 means zoomed in.
-scroll = [0, 0]
-
-loaded_image = None
-open_filepath = None
-image_loaded = False
-
+# Set up global brush
 brush = 'pixel'
 brush_color = (255, 0, 255, 255)
 brush_size = 5
 do_not_paint = False
 
-running = True
-while running:
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_ESCAPE:
+def main():
+    print("INSTRUCTIONS:")
+    print("Open an image file")
+    print("Left click to paint")
+    print("Middle click to use a color picker at the mouse position")
+    print("Right click and drag to pan")
+    print("Scroll to zoom")
+    print("Use the on-screen controls for everything else")
+
+    # Initialize pygame
+    pygame.init()
+    pygame.display.set_caption("Tile Art Helper")
+    display = pygame.display.set_mode((640, 360), pygame.SCALED)
+
+
+    # Create root (main) panel
+    main_panel = Panel((0, 0, 0, 0), True, (0, 0, 0))
+
+    # Set the main panel to render directly to the display surface
+    main_panel.surface = display
+
+
+    # Create the main canvas and make it a child of the main panel
+    canvas = Canvas((0, 0, display.get_width(), display.get_height()))
+    main_panel.add_canvas(canvas)
+
+
+    # Create a top panel and make it a child of the main panel
+    top_panel = Panel((0, 0, display.get_width(), 30), True)
+    main_panel.add_panel(top_panel)
+
+    # Top panel save options
+    open_image_button = Button((2, 2, 80, 20), canvas.open_file, "Open Image")
+    top_panel.add_button(open_image_button)
+    save_overwrite_button = Button((102, 2, 80, 20), canvas.save_image, "Save")
+    top_panel.add_button(save_overwrite_button)
+    save_overwrite_text = Text("Will overwrite previous!", 12, (255, 255, 255), (97, 22))
+    top_panel.add_text(save_overwrite_text)
+    save_as_button = Button((202, 2, 80, 20), canvas.save_as, "Save As")
+    top_panel.add_button(save_as_button)
+
+    
+    # Create bottom panel and make it a child of the main panel
+    bottom_panel = Panel((0, display.get_height() - 15, display.get_width(), 15), True)
+    main_panel.add_panel(bottom_panel)
+
+    # Bottom panel coordinate text
+    coords_text = Text(canvas.get_coords_text, 12, (255, 255, 255), (4, 3))
+    bottom_panel.add_text(coords_text)
+
+    # Bottom panel zoom buttons and text
+    zoom_text = Text(canvas.get_zoom_text, 12, (255, 255, 255), (display.get_width() - 80, 3))
+    bottom_panel.add_text(zoom_text)
+    increment_zoom_button = Button((display.get_width() - 30, 1, 13, 13), canvas.increment_zoom, "+")
+    bottom_panel.add_button(increment_zoom_button)
+    decrement_zoom_button = Button((display.get_width() - 95, 1, 13, 13), canvas.decrement_zoom, "-")
+    bottom_panel.add_button(decrement_zoom_button)
+
+
+    # Create tools panel and make it a child of the main panel
+    tools_panel = Panel((display.get_width() - 110, 50, 100, 130), False).set_caption("Brush tools")
+    main_panel.add_panel(tools_panel)
+
+    # Tools panel brush options
+    pixel_button = Button((10, 10, 80, 20), set_brush_pixel, "Pixel")
+    tools_panel.add_button(pixel_button)
+    brush_button = Button((10, 40, 80, 20), set_brush_brush, "Brush")
+    tools_panel.add_button(brush_button)
+    circle_button = Button((10, 70, 80, 20), set_brush_circle, "Circle")
+    tools_panel.add_button(circle_button)
+
+    # Tools panel brush size settings and text
+    brush_size_text = Text(get_brush_size_text, 16, (255, 255, 255), (45, 105))
+    tools_panel.add_text(brush_size_text)
+    increase_brush_size_button = Button((70, 100, 20, 20), increase_brush_size, "+")
+    tools_panel.add_button(increase_brush_size_button)
+    decrease_brush_size_button = Button((10, 100, 20, 20), decrease_brush_size, "-")
+    tools_panel.add_button(decrease_brush_size_button)
+
+
+    # Frame loop
+
+    running = True
+    while running:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
                 running = False
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            if event.button == 1:
-                for panel in panels:
-                    panel.left_mouse_down(event.pos)
-            if event.button == 2:
-                # Pick the color at the mouse position
-                brush_color = loaded_image.get_at((int((event.pos[0] - scroll[0]) % math.floor(loaded_image.get_width() * scale) / scale), int((event.pos[1] - scroll[1]) % math.floor(loaded_image.get_height() * scale) / scale)))
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    running = False
+            if event.type == pygame.MOUSEMOTION:
+                main_panel.mouse_moved(event.pos, event.rel)
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:
+                    main_panel.left_mouse_down(event.pos)
+                if event.button == 2:
+                    global brush_color
+                    if canvas.image_loaded:
+                        # Pick the color at the mouse position
+                        brush_color = canvas.loaded_image.get_at((int((event.pos[0] - canvas.scroll[0]) % math.floor(canvas.loaded_image.get_width() * canvas.zoom) / canvas.zoom), int((event.pos[1] - canvas.scroll[1]) % math.floor(canvas.loaded_image.get_height() * canvas.zoom) / canvas.zoom)))
+            if event.type == pygame.MOUSEBUTTONUP:
+                if event.button == 1:
+                    main_panel.left_mouse_up(event.pos)
+            if event.type == pygame.MOUSEWHEEL:
+                # Zooming
+                # If the mouse wheel is scrolled, manually update the canvas's zoom.
+                
+                # Keep track of the mouse position before the zoom, needed for centering the zoom at the mouse position.
+                # Keep in mind that scroll is negative.
+                previous_scaled_mouse_pos = (canvas.scroll[0] / canvas.zoom - pygame.mouse.get_pos()[0] / canvas.zoom, canvas.scroll[1] / canvas.zoom - pygame.mouse.get_pos()[1] / canvas.zoom)
 
-        if event.type == pygame.MOUSEWHEEL:
-            # Zooming
-            
-            # Keep track of the mouse position before the zoom, needed for centering the zoom at the mouse position.
-            # Keep in mind that scroll is negative.
-            previous_scaled_mouse_pos = (scroll[0] / scale - pygame.mouse.get_pos()[0] / scale, scroll[1] / scale - pygame.mouse.get_pos()[1] / scale)
+                # Adjust scale (zooms in/out)
+                canvas.zoom += event.y / 10 * canvas.zoom
 
-            # Adjust scale (zooms in/out)
-            scale += event.y / 10 * scale
+                # Limit how far the user can zoom in
+                canvas.zoom = min(20, canvas.zoom)
 
-            # Limit how far the user can zoom in
-            scale = min(20, scale)
+                # Limit how far the user can be zoom out
+                canvas.zoom = max(0.1, canvas.zoom)
 
-            # Limit how far the user can be zoom out
-            scale = max(0.1, scale)
+                # Round the zoom to the nearest percent
+                canvas.zoom = round(canvas.zoom, 2)
 
-            # Round the zoom to the nearest percent
-            scale = round(scale, 2)
+                # Center the zooming action at the mouse position.
+                new_scaled_mouse_pos = (canvas.scroll[0] / canvas.zoom - pygame.mouse.get_pos()[0] / canvas.zoom, canvas.scroll[1] / canvas.zoom - pygame.mouse.get_pos()[1] / canvas.zoom)
+                canvas.scroll[0] += (previous_scaled_mouse_pos[0] - new_scaled_mouse_pos[0]) * canvas.zoom
+                canvas.scroll[1] += (previous_scaled_mouse_pos[1] - new_scaled_mouse_pos[1]) * canvas.zoom
 
-            # Center the zooming action at the mouse position.
-            new_scaled_mouse_pos = (scroll[0] / scale - pygame.mouse.get_pos()[0] / scale, scroll[1] / scale - pygame.mouse.get_pos()[1] / scale)
-            scroll[0] += (previous_scaled_mouse_pos[0] - new_scaled_mouse_pos[0]) * scale
-            scroll[1] += (previous_scaled_mouse_pos[1] - new_scaled_mouse_pos[1]) * scale
+        # Left mouse button pressed
+        if pygame.mouse.get_pressed()[0]:
+            main_panel.left_mouse_pressed(pygame.mouse.get_pos())
 
-    # Painting
-    
-    if pygame.mouse.get_pressed()[0] == True:
-        if image_loaded:
-            for panel in panels: # Ensure that painting does not occur when the mouse clicks on a panel instead of the canvas.
-                if pygame.Rect((panel.x, panel.y), panel.surface.get_size()).collidepoint(pygame.mouse.get_pos()):
-                    break
-            else:
-                # Paint
-                if brush == 'pixel':
-                    pos_x = int((pygame.mouse.get_pos()[0] - scroll[0]) % (math.floor(loaded_image.get_width() * scale)) / scale)
-                    pos_y = int((pygame.mouse.get_pos()[1] - scroll[1]) % (math.floor(loaded_image.get_height() * scale)) / scale)
-                    loaded_image.set_at((pos_x, pos_y), brush_color)
-                elif brush == 'brush':
-                    center_pos_x = int((pygame.mouse.get_pos()[0] - scroll[0]) % (math.floor(loaded_image.get_width() * scale)) / scale)
-                    center_pos_y = int((pygame.mouse.get_pos()[1] - scroll[1]) % (math.floor(loaded_image.get_height() * scale)) / scale)
-                    for dy in range(brush_size * 2 + 1):
-                        for dx in range(brush_size * 2 + 1):
-                            pos_x = (center_pos_x + dx - brush_size) % loaded_image.get_width()
-                            pos_y = (center_pos_y + dy - brush_size) % loaded_image.get_height()
-                            point_distance = math.dist(pygame.mouse.get_pos(), (pygame.mouse.get_pos()[0] + dx - brush_size, pygame.mouse.get_pos()[1] + dy - brush_size))
-                            if point_distance <= brush_size:
-                                overlay_pixel(loaded_image, (pos_x, pos_y), (brush_color[0], brush_color[1], brush_color[2], brush_color[3] * (1 - point_distance / brush_size)))
-                elif brush == 'circle':
-                    center_pos_x = int((pygame.mouse.get_pos()[0] - scroll[0]) % (math.floor(loaded_image.get_width() * scale)) / scale)
-                    center_pos_y = int((pygame.mouse.get_pos()[1] - scroll[1]) % (math.floor(loaded_image.get_height() * scale)) / scale)
-                    for dy in range(brush_size * 2 + 1):
-                        for dx in range(brush_size * 2 + 1):
-                            if math.dist(pygame.mouse.get_pos(), (pygame.mouse.get_pos()[0] + dx - brush_size, pygame.mouse.get_pos()[1] + dy - brush_size)) <= brush_size:
-                                pos_x = (center_pos_x + dx - brush_size) % loaded_image.get_width()
-                                pos_y = (center_pos_y + dy - brush_size) % loaded_image.get_height()
-                                loaded_image.set_at((pos_x, pos_y), brush_color)
-                                
-    # Panning
+                        
+        # Panning
 
-    if pygame.mouse.get_pressed()[2] == True:
-        scroll[0] += pygame.mouse.get_pos()[0] - previous_mouse_pos[0]
-        scroll[1] += pygame.mouse.get_pos()[1] - previous_mouse_pos[1]
+        # If the right mouse button is pressed, manually update the canvas's scroll based on mouse movement.
+        if pygame.mouse.get_pressed()[2]:
+            canvas.scroll[0] += pygame.mouse.get_pos()[0] - previous_mouse_pos[0]
+            canvas.scroll[1] += pygame.mouse.get_pos()[1] - previous_mouse_pos[1]
 
-    previous_mouse_pos = pygame.mouse.get_pos() # pygame.mouse.get_rel() does not take into account pygame.SCALED
+        previous_mouse_pos = pygame.mouse.get_pos() # pygame.mouse.get_rel() does not take into account pygame.SCALED
 
-    # Rendering
-    
-    display.fill((0, 0, 0))
 
-    # Render the loaded image
-    if image_loaded:
-        # Scale the loaded image to be rendered
-        # This gets laggy when zoomed in due to large image sizes. This should be fixed in future versions.
-        scaled_image = pygame.transform.scale(loaded_image, (loaded_image.get_width() * scale, loaded_image.get_height() * scale))
+        # Rendering
 
-        # Apply the modulo function to the scroll to make the tiled image rendering appear continuous.
-        scroll[0] %= -scaled_image.get_width()
-        scroll[1] %= -scaled_image.get_height()
+        # Clear display
+        display.fill((0, 0, 0))
 
-        # Tile and draw the image
-        for y in range(math.ceil(display.get_height() / loaded_image.get_height() / scale) + 2):
-            for x in range(math.ceil(display.get_width() / loaded_image.get_width() / scale) + 2):
-                display.blit(scaled_image, (x * math.floor(loaded_image.get_width() * scale) + scroll[0], y * math.floor(loaded_image.get_height() * scale) + scroll[1]))
+        # Render main panel
+        main_panel.render(display, pygame.mouse.get_pos())
 
-    # Render panels
-    for panel in panels:
-        panel.render(display, pygame.mouse.get_pos())
+        # Update pygame display and tick the pygame clock
+        pygame.display.update()
+        pygame.time.Clock().tick(60)
 
-    # Update pygame display and tick the pygame clock
-    pygame.display.update()
-    pygame.time.Clock().tick(60)
+    # Loop exited
+    pygame.quit()    
 
-pygame.quit()
+if __name__ == '__main__':
+    main()
