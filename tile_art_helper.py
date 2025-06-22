@@ -1,4 +1,4 @@
-## Tile Art Helper v0.3.0
+## Tile Art Helper v0.3.1
 ## Author: Alexander Art
 
 import pygame, tkinter, math
@@ -10,7 +10,9 @@ class Panel:
     title_bar_height = 10
     
     def __init__(self, rect, fixed, bgcolor=(127, 63, 0)):
-        # Panels can either be rendered on a pygame surface directly or can be children of other panels.
+        # This panel's parent object. This gets set with parent.add_panel(self).
+        # If the parent is a pygame surface instead of a panel, self.parent should remain None and rendering/input functions must be called explicitly.
+        self.parent = None
         
         # Create rect object from rect argument.
         rect = pygame.Rect(rect)
@@ -20,8 +22,8 @@ class Panel:
         self.surface = pygame.Surface(rect.size)
 
         # Position of the panel relative to the top left corner of its parent.
-        self.x = rect.x
-        self.y = rect.y
+        self.local_x = rect.x
+        self.local_y = rect.y
 
         # True if the panel should be fixed and not have a title bar.
         # False if the panel should have a title bar and be movable.
@@ -43,14 +45,47 @@ class Panel:
         self.buttons = []
         self.text = []
 
-    def get_bounding_rect(self):
-        if self.fixed:
-            return pygame.Rect(self.x, self.y, self.surface.get_width(), self.surface.get_height())
-        else:
-            return pygame.Rect(self.x, self.y - self.title_bar_height, self.surface.get_width(), self.surface.get_height() + self.title_bar_height)
+    def get_local_pos(self):
+        return (self.local_x, self.local_y)
 
-    def get_title_bar_rect(self):
-        return pygame.Rect(self.x, self.y - self.title_bar_height, self.surface.get_width(), self.title_bar_height)
+    def get_global_pos(self):
+        if self.parent is not None:
+            parent_pos = self.parent.get_global_pos() # Avoids redundant recursive calls
+            return (parent_pos[0] + self.local_x, parent_pos[1] + self.local_y)
+        else:
+            return (self.local_x, self.local_y)
+
+    @property
+    def global_x(self):
+        return self.get_global_pos()[0]
+
+    @property
+    def global_y(self):
+        return self.get_global_pos()[1]
+
+    def get_local_bounding_rect(self):
+        if self.fixed:
+            return pygame.Rect(self.local_x, self.local_y, self.surface.get_width(), self.surface.get_height())
+        else:
+            return pygame.Rect(self.local_x, self.local_y - self.title_bar_height, self.surface.get_width(), self.surface.get_height() + self.title_bar_height)
+
+    def get_global_bounding_rect(self):
+        if self.fixed:
+            return pygame.Rect(self.global_x, self.global_y, self.surface.get_width(), self.surface.get_height())
+        else:
+            return pygame.Rect(self.global_x, self.global_y - self.title_bar_height, self.surface.get_width(), self.surface.get_height() + self.title_bar_height)
+
+    def get_local_title_bar_rect(self):
+        if self.fixed:
+            return None
+        else:
+            return pygame.Rect(self.local_x, self.local_y - self.title_bar_height, self.surface.get_width(), self.title_bar_height)
+
+    def get_global_title_bar_rect(self):
+        if self.fixed:
+            return None
+        else:
+            return pygame.Rect(self.global_x, self.global_y - self.title_bar_height, self.surface.get_width(), self.title_bar_height)
 
     def set_caption(self, caption):
         self.title = caption
@@ -58,30 +93,34 @@ class Panel:
             
     def add_panel(self, panel):
         self.panels.append(panel)
+        panel.parent = self
         return self
 
     def add_canvas(self, canvas):
         self.canvases.append(canvas)
+        canvas.parent = self
         return self
 
     def add_button(self, button):
         self.buttons.append(button)
+        button.parent = self
         return self
 
     def add_text(self, text):
         self.text.append(text)
+        text.parent = self
         return self
 
-    def render(self, surface, mouse_pos):
-        # Passed mouse_pos argument should be relative to the top left corner of the surface or panel that this panel is rendered on.
+    def render(self, surface):
+        # If this panel is not fixed, draw the tittle bar and its caption onto the passed surface.
+        if not self.fixed:
+            pygame.draw.rect(surface, (255, 255, 255), (self.local_x, self.local_y - 10, self.surface.get_width(), 10))
+            surface.blit(pygame.font.Font(None, 12).render(self.title, True, (0, 0, 0)), (self.local_x + 2, self.local_y - 9))
+
+        # Render self.surface before blitting it onto the passed surface.
 
         # Clear panel surface
         self.surface.fill(self.bgcolor)
-
-        # If this panel is not fixed, draw the tittle bar and its caption
-        if not self.fixed:
-            pygame.draw.rect(surface, (255, 255, 255), (self.x, self.y - 10, self.surface.get_width(), 10))
-            surface.blit(pygame.font.Font(None, 12).render(self.title, True, (0, 0, 0)), (self.x + 2, self.y - 9))
 
         # Render child canvases
         for canvas in self.canvases:
@@ -89,77 +128,83 @@ class Panel:
 
         # Render child panels
         for panel in self.panels:
-            panel.render(self.surface, (mouse_pos[0] - self.x, mouse_pos[1] - self.y))
+            panel.render(self.surface)
 
         # Render child buttons
         for button in self.buttons:
-            button.render(self.surface, (mouse_pos[0] - self.x, mouse_pos[1] - self.y))
+            button.render(self.surface)
             
         # Render child text
         for text in self.text:
             text.render(self.surface)
 
         # Blit the panel surface (self.surface) onto the given surface (surface)
-        surface.blit(self.surface, (self.x, self.y))
+        surface.blit(self.surface, (self.local_x, self.local_y))
 
-    def mouse_moved(self, mouse_pos, mouse_rel):
+    def mouse_moved(self, mouse_rel):
         # This function runs every frame the mouse moves.
 
         # If the panel is being dragged, make it follow the mouse
         if self.title_bar_held:
-            self.x += mouse_rel[0]
-            self.y += mouse_rel[1]
+            self.local_x += mouse_rel[0]
+            self.local_y += mouse_rel[1]
 
         # Pass mouse move to child panels
         for panel in self.panels:
-            panel.mouse_moved((mouse_pos[0] - self.x, mouse_pos[1] - self.y), mouse_rel)
+            panel.mouse_moved(mouse_rel)
 
-    def left_mouse_down(self, mouse_pos):
+    def left_mouse_down(self):
         # This function runs on the left mousedown event.
-        # Passed mouse_pos argument should be relative to the top left corner of the surface or panel that this panel is rendered on.
-
+    
         # Detect when title bar is visible and is pressed
         if not self.fixed:
-            if self.get_title_bar_rect().collidepoint(mouse_pos):
+            if self.get_global_title_bar_rect().collidepoint(pygame.mouse.get_pos()):
                 self.title_bar_held = True
 
         # Pass mouse press to child panels
         for panel in self.panels:
-            panel.left_mouse_down((mouse_pos[0] - self.x, mouse_pos[1] - self.y))
+            panel.left_mouse_down()
 
         # Pass mouse press to child buttons
         for button in self.buttons:
-            button.left_mouse_down((mouse_pos[0] - self.x, mouse_pos[1] - self.y))
+            button.left_mouse_down()
 
-    def left_mouse_pressed(self, mouse_pos):
+    def left_mouse_pressed(self):
         # This function runs every frame the left mouse button is down.
-        # Passed mouse_pos argument should be relative to the top left corner of the surface or panel that this panel is rendered on.
 
         # Child panels cover child canvases and can block them from being pressed
         for panel in self.panels:
             # Detect overlap
-            if panel.get_bounding_rect().collidepoint(mouse_pos):
+            if panel.get_global_bounding_rect().collidepoint(pygame.mouse.get_pos()):
                 break
         else:
             # Only runs if no child panels were pressed
             # Pass mouse press to child canvases
             for canvas in self.canvases:
-                canvas.left_mouse_pressed((mouse_pos[0] - self.x, mouse_pos[1] - self.y))
+                canvas.left_mouse_pressed()
 
-    def left_mouse_up(self, mouse_pos):
+    def left_mouse_up(self):
         # This function runs on the left mouseup event.
         
         self.title_bar_held = False
 
+        # To keep the title bar visible, ensure that the title bar is not dragged off the parent panel
+        if not self.fixed:
+            self.local_x = max(self.local_x, 0)
+            self.local_x = min(self.local_x, self.parent.surface.get_width() - self.surface.get_width())
+            self.local_y = max(self.local_y, self.title_bar_height)
+            self.local_y = min(self.local_y, self.parent.surface.get_height())
+
         # Pass mouse move to child panels
         for panel in self.panels:
-            panel.left_mouse_up((mouse_pos[0] - self.x, mouse_pos[1] - self.y))
+            panel.left_mouse_up()
 
 # Class for canvas UI element
 class Canvas:
     def __init__(self, rect):
-        # Canvases can either be rendered on a pygame surface directly or can be children of panels.
-        # The canvas having any local position other than (0, 0) is not yet supported.
+        # This canvas's parent object. This gets set with parent.add_canvas(self).
+        # If the parent is a pygame surface instead of a panel, self.parent should remain None and rendering/input functions must be called explicitly.
+        self.parent = None
 
         # Create rect object from rect argument.
         rect = pygame.Rect(rect)
@@ -169,8 +214,8 @@ class Canvas:
         self.surface = pygame.Surface(rect.size)
 
         # Position of the canvas relative to the top left corner of its parent.
-        self.x = rect.x
-        self.y = rect.y
+        self.local_x = rect.x
+        self.local_y = rect.y
 
         self.zoom = 1 # zoom < 1 means zoomed out. zoom > 1 means zoomed in.
         self.scroll = [0, 0]
@@ -179,8 +224,29 @@ class Canvas:
         self.open_filepath = None
         self.image_loaded = False
 
-    def get_bounding_rect(self):
-        return pygame.Rect(self.x, self.y, self.surface.get_width(), self.surface.get_height())
+    def get_local_pos(self):
+        return (self.local_x, self.local_y)
+
+    def get_global_pos(self):
+        if self.parent is not None:
+            parent_pos = self.parent.get_global_pos() # Avoids redundant recursive calls
+            return (parent_pos[0] + self.local_x, parent_pos[1] + self.local_y)
+        else:
+            return (self.local_x, self.local_y)
+
+    @property
+    def global_x(self):
+        return self.get_global_pos()[0]
+
+    @property
+    def global_y(self):
+        return self.get_global_pos()[1]
+    
+    def get_local_bounding_rect(self):
+        return pygame.Rect(self.local_x, self.local_y, self.surface.get_width(), self.surface.get_height())
+
+    def get_global_bounding_rect(self):
+        return pygame.Rect(self.global_x, self.global_y, self.surface.get_width(), self.surface.get_height())
 
     def get_coords_text(self):
         # Returns the coordinates of the mouse position on the canvas as text.
@@ -243,11 +309,15 @@ class Canvas:
             # Tile and draw the image
             for y in range(math.ceil(surface.get_height() / self.loaded_image.get_height() / self.zoom) + 2):
                 for x in range(math.ceil(surface.get_width() / self.loaded_image.get_width() / self.zoom) + 2):
-                    surface.blit(scaled_image, (x * math.floor(self.loaded_image.get_width() * self.zoom) + self.scroll[0], y * math.floor(self.loaded_image.get_height() * self.zoom) + self.scroll[1]))
+                    self.surface.blit(scaled_image, (x * math.floor(self.loaded_image.get_width() * self.zoom) + self.scroll[0], y * math.floor(self.loaded_image.get_height() * self.zoom) + self.scroll[1]))
 
-    def left_mouse_pressed(self, mouse_pos):
-        # Passed mouse_pos argument should be relative to the top left corner of the surface or panel that this canvas is rendered on.
-
+            # The rendered self.surface is blitted it onto the passed surface.
+            surface.blit(self.surface, self.get_local_pos())
+            
+    def left_mouse_pressed(self):
+        # Mouse position relative to the top left corner of the canvas
+        mouse_pos = (pygame.mouse.get_pos()[0] - self.global_x, pygame.mouse.get_pos()[1] - self.global_y)
+        
         if self.image_loaded:
             # Paint
             if brush == 'pixel':
@@ -277,22 +347,51 @@ class Canvas:
 # Class for button UI elements
 class Button:
     def __init__(self, rect, action, label):
-        self.rect = pygame.Rect(rect)
+        # This button's parent object. This gets set with parent.add_button(self).
+        # If the parent is a pygame surface instead of a panel, self.parent should remain None and rendering/input functions must be called explicitly.
+        self.parent = None
+
+        self.rect = pygame.Rect(rect) # Relative to parent
         self.action = action
         self.label = label
+        
+    def get_local_pos(self):
+        return (self.local_x, self.local_y)
 
-    def render(self, surface, mouse_pos):
+    def get_global_pos(self):
+        if self.parent is not None:
+            parent_pos = self.parent.get_global_pos() # Avoids redundant recursive calls
+            return (parent_pos[0] + self.rect.x, parent_pos[1] + self.rect.y)
+        else:
+            return (self.rect.x, self.rect.y)
+
+    @property
+    def global_x(self):
+        return self.get_global_pos()[0]
+
+    @property
+    def global_y(self):
+        return self.get_global_pos()[1]
+
+    def render(self, surface):
+        # Mouse position relative to the top left corner of the parent
+        mouse_pos = (pygame.mouse.get_pos()[0] - self.parent.global_x, pygame.mouse.get_pos()[1] - self.parent.global_y)
+
+        # Change the button color if it is being hovered
         if self.rect.collidepoint(mouse_pos):
             color = (255, 127, 63)
         else:
             color = (63, 0, 0)
-            
+
+        # Draw button bounding rect
         pygame.draw.rect(surface, color, self.rect)
-        
+
+        # Draw button label
         surface.blit(pygame.font.Font(None, 16).render(self.label, True, (255, 255, 255)), (self.rect.x + 4, self.rect.y + 3))
 
-    def left_mouse_down(self, mouse_pos):
-        # Passed mouse_pos argument should be relative to the top left corner of the surface or panel that this button is rendered on.
+    def left_mouse_down(self):
+        # Mouse position relative to the top left corner of the parent
+        mouse_pos = (pygame.mouse.get_pos()[0] - self.parent.global_x, pygame.mouse.get_pos()[1] - self.parent.global_y)
 
         # If this button is pressed, run its function.
         if self.rect.collidepoint(mouse_pos):
@@ -300,6 +399,10 @@ class Button:
 
 class Text:
     def __init__(self, message, size, color, pos):
+        # This text's parent object. This gets set with parent.add_text(self).
+        # If the parent is a pygame surface instead of a panel, self.parent should remain None and self.render() must be called explicitly.
+        self.parent = None
+        
         # Text string
         self.message = message
 
@@ -309,8 +412,27 @@ class Text:
         # Font color
         self.color = color
 
-        # Text position (relative to the surface or panel that the text is rendered on)
-        self.pos = pos
+        # Text position (relative to the surface or parent panel that the text is rendered on)
+        self.local_x = pos[0]
+        self.local_y = pos[1]
+
+    def get_local_pos(self):
+        return (self.local_x, self.local_y)
+
+    def get_global_pos(self):
+        if self.parent is not None:
+            parent_pos = self.parent.get_global_pos() # Avoids redundant recursive calls
+            return (parent_pos[0] + self.local_x, parent_pos[1] + self.local_y)
+        else:
+            return (self.local_x, self.local_y)
+
+    @property
+    def global_x(self):
+        return self.get_global_pos()[0]
+
+    @property
+    def global_y(self):
+        return self.get_global_pos()[1]
 
     def render(self, surface):
         # If the string is given by a function, then call the function.
@@ -320,7 +442,7 @@ class Text:
             message = self.message
 
         # Render the text
-        surface.blit(pygame.font.Font(None, self.size).render(message, True, self.color), self.pos)
+        surface.blit(pygame.font.Font(None, self.size).render(message, True, self.color), self.get_local_pos())
 
 # Works with transparency
 def overlay_pixel(image_source, pos, color):
@@ -374,6 +496,7 @@ def main():
     print("Right click and drag to pan")
     print("Scroll to zoom")
     print("Use the on-screen controls for everything else")
+    
 
     # Initialize pygame
     pygame.init()
@@ -457,10 +580,10 @@ def main():
                 if event.key == pygame.K_ESCAPE:
                     running = False
             if event.type == pygame.MOUSEMOTION:
-                main_panel.mouse_moved(event.pos, event.rel)
+                main_panel.mouse_moved(event.rel)
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
-                    main_panel.left_mouse_down(event.pos)
+                    main_panel.left_mouse_down()
                 if event.button == 2:
                     global brush_color
                     if canvas.image_loaded:
@@ -468,7 +591,7 @@ def main():
                         brush_color = canvas.loaded_image.get_at((int((event.pos[0] - canvas.scroll[0]) % math.floor(canvas.loaded_image.get_width() * canvas.zoom) / canvas.zoom), int((event.pos[1] - canvas.scroll[1]) % math.floor(canvas.loaded_image.get_height() * canvas.zoom) / canvas.zoom)))
             if event.type == pygame.MOUSEBUTTONUP:
                 if event.button == 1:
-                    main_panel.left_mouse_up(event.pos)
+                    main_panel.left_mouse_up()
             if event.type == pygame.MOUSEWHEEL:
                 # Zooming
                 # If the mouse wheel is scrolled, manually update the canvas's zoom.
@@ -496,7 +619,7 @@ def main():
 
         # Left mouse button pressed
         if pygame.mouse.get_pressed()[0]:
-            main_panel.left_mouse_pressed(pygame.mouse.get_pos())
+            main_panel.left_mouse_pressed()
 
                         
         # Panning
@@ -515,7 +638,7 @@ def main():
         display.fill((0, 0, 0))
 
         # Render main panel
-        main_panel.render(display, pygame.mouse.get_pos())
+        main_panel.render(display)
 
         # Update pygame display and tick the pygame clock
         pygame.display.update()
