@@ -1,4 +1,4 @@
-## Tile Art Helper v0.3.1
+## Tile Art Helper v0.3.2
 ## Author: Alexander Art
 
 import pygame, tkinter, math
@@ -153,35 +153,39 @@ class Panel:
         for panel in self.panels:
             panel.mouse_moved(mouse_rel)
 
+        # Pass mouse move to child canvases
+        for canvas in self.canvases:
+            # The mouse move does not need to be passed to the canvases if the mouse did not move
+            if not (mouse_rel[0] == 0 and mouse_rel[1] == 0):
+                canvas.mouse_moved(mouse_rel)
+
     def left_mouse_down(self):
         # This function runs on the left mousedown event.
-    
-        # Detect when title bar is visible and is pressed
-        if not self.fixed:
-            if self.get_global_title_bar_rect().collidepoint(pygame.mouse.get_pos()):
-                self.title_bar_held = True
 
-        # Pass mouse press to child panels
-        for panel in self.panels:
-            panel.left_mouse_down()
+        if not clicks_blocked:
+            # Detect when title bar is visible and is pressed
+            if not self.fixed:
+                if self.get_global_title_bar_rect().collidepoint(pygame.mouse.get_pos()):
+                    self.title_bar_held = True
 
-        # Pass mouse press to child buttons
-        for button in self.buttons:
-            button.left_mouse_down()
+            # Pass mouse press to child panels
+            for panel in self.panels:
+                panel.left_mouse_down()
 
-    def left_mouse_pressed(self):
-        # This function runs every frame the left mouse button is down.
+            # Child panels cover child canvases and can block them from being pressed
+            for panel in self.panels:
+                # Detect overlap
+                if panel.get_global_bounding_rect().collidepoint(pygame.mouse.get_pos()):
+                    break
+            else:
+                # Only runs if no child panels were pressed
+                # Pass mouse press to child canvases
+                for canvas in self.canvases:
+                    canvas.left_mouse_down()
 
-        # Child panels cover child canvases and can block them from being pressed
-        for panel in self.panels:
-            # Detect overlap
-            if panel.get_global_bounding_rect().collidepoint(pygame.mouse.get_pos()):
-                break
-        else:
-            # Only runs if no child panels were pressed
-            # Pass mouse press to child canvases
-            for canvas in self.canvases:
-                canvas.left_mouse_pressed()
+            # Pass mouse press to child buttons
+            for button in self.buttons:
+                button.left_mouse_down()
 
     def left_mouse_up(self):
         # This function runs on the left mouseup event.
@@ -195,9 +199,13 @@ class Panel:
             self.local_y = max(self.local_y, self.title_bar_height)
             self.local_y = min(self.local_y, self.parent.surface.get_height())
 
-        # Pass mouse move to child panels
+        # Pass mouse up to child panels
         for panel in self.panels:
             panel.left_mouse_up()
+
+        # Pass mouse up to child canvases
+        for canvas in self.canvases:
+            canvas.left_mouse_up()
 
 # Class for canvas UI element
 class Canvas:
@@ -223,6 +231,9 @@ class Canvas:
         self.loaded_image = None
         self.open_filepath = None
         self.image_loaded = False
+
+        # True when the brush is being painted on the canvas.
+        self.brush_down = False
 
     def get_local_pos(self):
         return (self.local_x, self.local_y)
@@ -271,6 +282,10 @@ class Canvas:
         self.zoom = max(0.1, self.zoom)
 
     def open_file(self):
+        # Block clicks before opening filedialog
+        global clicks_blocked
+        clicks_blocked = True
+        
         filepath = tkinter.filedialog.askopenfilename()
         try:
             self.loaded_image = pygame.image.load(filepath).convert_alpha()
@@ -287,6 +302,10 @@ class Canvas:
 
     def save_as(self):
         if self.image_loaded:
+            # Block clicks before opening filedialog
+            global clicks_blocked
+            clicks_blocked = True
+            
             filepath = filedialog.asksaveasfilename()
             try:
                 pygame.image.save(self.loaded_image, filepath)
@@ -313,36 +332,75 @@ class Canvas:
 
             # The rendered self.surface is blitted it onto the passed surface.
             surface.blit(self.surface, self.get_local_pos())
-            
-    def left_mouse_pressed(self):
+
+    def mouse_moved(self, mouse_rel):
         # Mouse position relative to the top left corner of the canvas
         mouse_pos = (pygame.mouse.get_pos()[0] - self.global_x, pygame.mouse.get_pos()[1] - self.global_y)
-        
-        if self.image_loaded:
-            # Paint
-            if brush == 'pixel':
-                pos_x = int((mouse_pos[0] - self.scroll[0]) % (math.floor(self.loaded_image.get_width() * self.zoom)) / self.zoom)
-                pos_y = int((mouse_pos[1] - self.scroll[1]) % (math.floor(self.loaded_image.get_height() * self.zoom)) / self.zoom)
-                self.loaded_image.set_at((pos_x, pos_y), brush_color)
-            elif brush == 'brush':
-                center_pos_x = int((mouse_pos[0] - self.scroll[0]) % (math.floor(self.loaded_image.get_width() * self.zoom)) / self.zoom)
-                center_pos_y = int((mouse_pos[1] - self.scroll[1]) % (math.floor(self.loaded_image.get_height() * self.zoom)) / self.zoom)
-                for dy in range(brush_size * 2 + 1):
-                    for dx in range(brush_size * 2 + 1):
-                        pos_x = (center_pos_x + dx - brush_size) % self.loaded_image.get_width()
-                        pos_y = (center_pos_y + dy - brush_size) % self.loaded_image.get_height()
-                        point_distance = math.dist(mouse_pos, (mouse_pos[0] + dx - brush_size, mouse_pos[1] + dy - brush_size))
-                        if point_distance <= brush_size:
-                            overlay_pixel(self.loaded_image, (pos_x, pos_y), (brush_color[0], brush_color[1], brush_color[2], brush_color[3] * (1 - point_distance / brush_size)))
-            elif brush == 'circle':
-                center_pos_x = int((mouse_pos[0] - self.scroll[0]) % (math.floor(self.loaded_image.get_width() * self.zoom)) / self.zoom)
-                center_pos_y = int((mouse_pos[1] - self.scroll[1]) % (math.floor(self.loaded_image.get_height() * self.zoom)) / self.zoom)
-                for dy in range(brush_size * 2 + 1):
-                    for dx in range(brush_size * 2 + 1):
-                        if math.dist(mouse_pos, (mouse_pos[0] + dx - brush_size, mouse_pos[1] + dy - brush_size)) <= brush_size:
+        mouse_move_distance = math.hypot(*mouse_rel)
+
+        # Spacing between each painted spot along the line that was painted
+        spacing = self.zoom # Scalar
+        space = (mouse_rel[0] / mouse_move_distance * spacing, mouse_rel[1] / mouse_move_distance * spacing) # Vector with magnitude of spacing in the direction of mouse_rel
+
+        # If an image is loaded and the brush is down, paint between the current position and the previous position
+        if self.image_loaded and self.brush_down:
+            # Paint along the line the mouse moved
+            for i in range(max(1, int(mouse_move_distance / spacing))):
+                center_pos_x = int((mouse_pos[0] - i * space[0] - self.scroll[0]) % (math.floor(self.loaded_image.get_width() * self.zoom)) / self.zoom)
+                center_pos_y = int((mouse_pos[1] - i * space[1] - self.scroll[1]) % (math.floor(self.loaded_image.get_height() * self.zoom)) / self.zoom)
+                if brush == 'pixel':
+                    self.loaded_image.set_at((center_pos_x, center_pos_y), brush_color)
+                elif brush == 'brush':
+                    for dy in range(brush_size * 2 + 1):
+                        for dx in range(brush_size * 2 + 1):
                             pos_x = (center_pos_x + dx - brush_size) % self.loaded_image.get_width()
                             pos_y = (center_pos_y + dy - brush_size) % self.loaded_image.get_height()
-                            self.loaded_image.set_at((pos_x, pos_y), brush_color)
+                            point_distance = math.dist(mouse_pos, (mouse_pos[0] + dx - brush_size, mouse_pos[1] + dy - brush_size))
+                            if point_distance <= brush_size:
+                                overlay_pixel(self.loaded_image, (pos_x, pos_y), (brush_color[0], brush_color[1], brush_color[2], brush_color[3] * (1 - point_distance / brush_size)))
+                elif brush == 'circle':
+                    for dy in range(brush_size * 2 + 1):
+                        for dx in range(brush_size * 2 + 1):
+                            if math.dist(mouse_pos, (mouse_pos[0] + dx - brush_size, mouse_pos[1] + dy - brush_size)) <= brush_size:
+                                pos_x = (center_pos_x + dx - brush_size) % self.loaded_image.get_width()
+                                pos_y = (center_pos_y + dy - brush_size) % self.loaded_image.get_height()
+                                self.loaded_image.set_at((pos_x, pos_y), brush_color)
+            
+    def left_mouse_down(self):
+        if not clicks_blocked:
+            # The canvas was pressed, so the brush is down
+            self.brush_down = True
+            
+            # Mouse position relative to the top left corner of the canvas
+            mouse_pos = (pygame.mouse.get_pos()[0] - self.global_x, pygame.mouse.get_pos()[1] - self.global_y)
+
+            # If an image is loaded, paint at the mouse position
+            if self.image_loaded:
+                # Calculate the pixel position on the canvas where the mouse is
+                center_pos_x = int((mouse_pos[0] - self.scroll[0]) % (math.floor(self.loaded_image.get_width() * self.zoom)) / self.zoom)
+                center_pos_y = int((mouse_pos[1] - self.scroll[1]) % (math.floor(self.loaded_image.get_height() * self.zoom)) / self.zoom)
+                # Paint
+                if brush == 'pixel':
+                    self.loaded_image.set_at((center_pos_x, center_pos_y), brush_color)
+                elif brush == 'brush':
+                    for dy in range(brush_size * 2 + 1):
+                        for dx in range(brush_size * 2 + 1):
+                            pos_x = (center_pos_x + dx - brush_size) % self.loaded_image.get_width()
+                            pos_y = (center_pos_y + dy - brush_size) % self.loaded_image.get_height()
+                            point_distance = math.dist(mouse_pos, (mouse_pos[0] + dx - brush_size, mouse_pos[1] + dy - brush_size))
+                            if point_distance <= brush_size:
+                                overlay_pixel(self.loaded_image, (pos_x, pos_y), (brush_color[0], brush_color[1], brush_color[2], brush_color[3] * (1 - point_distance / brush_size)))
+                elif brush == 'circle':
+                    for dy in range(brush_size * 2 + 1):
+                        for dx in range(brush_size * 2 + 1):
+                            if math.dist(mouse_pos, (mouse_pos[0] + dx - brush_size, mouse_pos[1] + dy - brush_size)) <= brush_size:
+                                pos_x = (center_pos_x + dx - brush_size) % self.loaded_image.get_width()
+                                pos_y = (center_pos_y + dy - brush_size) % self.loaded_image.get_height()
+                                self.loaded_image.set_at((pos_x, pos_y), brush_color)
+
+    def left_mouse_up(self):
+        # The mouse was released, so the brush is not down
+        self.brush_down = False
 
 # Class for button UI elements
 class Button:
@@ -488,6 +546,9 @@ brush_color = (255, 0, 255, 255)
 brush_size = 5
 do_not_paint = False
 
+# Used for blocking input upon exiting filedialog
+clicks_blocked = False
+
 def main():
     print("INSTRUCTIONS:")
     print("Open an image file")
@@ -569,7 +630,7 @@ def main():
     tools_panel.add_button(decrease_brush_size_button)
 
 
-    # Frame loop
+    # Frame loop (repeats every frame the program is open)
 
     running = True
     while running:
@@ -585,9 +646,9 @@ def main():
                 if event.button == 1:
                     main_panel.left_mouse_down()
                 if event.button == 2:
-                    global brush_color
                     if canvas.image_loaded:
                         # Pick the color at the mouse position
+                        global brush_color
                         brush_color = canvas.loaded_image.get_at((int((event.pos[0] - canvas.scroll[0]) % math.floor(canvas.loaded_image.get_width() * canvas.zoom) / canvas.zoom), int((event.pos[1] - canvas.scroll[1]) % math.floor(canvas.loaded_image.get_height() * canvas.zoom) / canvas.zoom)))
             if event.type == pygame.MOUSEBUTTONUP:
                 if event.button == 1:
@@ -617,10 +678,6 @@ def main():
                 canvas.scroll[0] += (previous_scaled_mouse_pos[0] - new_scaled_mouse_pos[0]) * canvas.zoom
                 canvas.scroll[1] += (previous_scaled_mouse_pos[1] - new_scaled_mouse_pos[1]) * canvas.zoom
 
-        # Left mouse button pressed
-        if pygame.mouse.get_pressed()[0]:
-            main_panel.left_mouse_pressed()
-
                         
         # Panning
 
@@ -630,7 +687,12 @@ def main():
             canvas.scroll[1] += pygame.mouse.get_pos()[1] - previous_mouse_pos[1]
 
         previous_mouse_pos = pygame.mouse.get_pos() # pygame.mouse.get_rel() does not take into account pygame.SCALED
+        
 
+        # clicks_blocked is only needed for one frame.
+        global clicks_blocked
+        clicks_blocked = False
+        
 
         # Rendering
 
