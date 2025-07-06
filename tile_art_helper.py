@@ -1,4 +1,4 @@
-## Tile Art Helper v0.3.2
+## Tile Art Helper v0.3.3
 ## Author: Alexander Art
 
 import pygame, tkinter, math
@@ -15,15 +15,8 @@ class Panel:
         self.parent = None
         
         # Create rect object from rect argument.
-        rect = pygame.Rect(rect)
-
-        # Create the panel surface.
-        # Once created, the panel size is fixed. (Consider changing this in future versions!)
-        self.surface = pygame.Surface(rect.size)
-
-        # Position of the panel relative to the top left corner of its parent.
-        self.local_x = rect.x
-        self.local_y = rect.y
+        # Rect left (x) and top (y) values become the local x and y values for the panel.
+        self.rect = pygame.Rect(rect)
 
         # True if the panel should be fixed and not have a title bar.
         # False if the panel should have a title bar and be movable.
@@ -45,6 +38,46 @@ class Panel:
         self.buttons = []
         self.text = []
 
+    @property
+    def size(self):
+        return self.rect.size
+
+    @size.setter
+    def size(self, value):
+        self.rect.size = value
+
+    @property
+    def width(self):
+        return self.rect.width
+
+    @width.setter
+    def width(self, value):
+        self.rect.width = value
+
+    @property
+    def height(self):
+        return self.rect.height
+
+    @height.setter
+    def height(self, value):
+        self.rect.height = value
+        
+    @property
+    def local_x(self):
+        return self.rect.x
+
+    @local_x.setter
+    def local_x(self, value):
+        self.rect.x = value
+
+    @property
+    def local_y(self):
+        return self.rect.y
+
+    @local_y.setter
+    def local_y(self, value):
+        self.rect.y = value
+
     def get_local_pos(self):
         return (self.local_x, self.local_y)
 
@@ -65,27 +98,27 @@ class Panel:
 
     def get_local_bounding_rect(self):
         if self.fixed:
-            return pygame.Rect(self.local_x, self.local_y, self.surface.get_width(), self.surface.get_height())
+            return self.rect
         else:
-            return pygame.Rect(self.local_x, self.local_y - self.title_bar_height, self.surface.get_width(), self.surface.get_height() + self.title_bar_height)
+            return pygame.Rect(self.local_x, self.local_y - self.title_bar_height, self.width, self.height + self.title_bar_height)
 
     def get_global_bounding_rect(self):
         if self.fixed:
-            return pygame.Rect(self.global_x, self.global_y, self.surface.get_width(), self.surface.get_height())
+            return pygame.Rect(self.get_global_pos(), self.size)
         else:
-            return pygame.Rect(self.global_x, self.global_y - self.title_bar_height, self.surface.get_width(), self.surface.get_height() + self.title_bar_height)
+            return pygame.Rect(self.global_x, self.global_y - self.title_bar_height, self.width, self.height + self.title_bar_height)
 
     def get_local_title_bar_rect(self):
         if self.fixed:
             return None
         else:
-            return pygame.Rect(self.local_x, self.local_y - self.title_bar_height, self.surface.get_width(), self.title_bar_height)
+            return pygame.Rect(self.local_x, self.local_y - self.title_bar_height, self.width, self.title_bar_height)
 
     def get_global_title_bar_rect(self):
         if self.fixed:
             return None
         else:
-            return pygame.Rect(self.global_x, self.global_y - self.title_bar_height, self.surface.get_width(), self.title_bar_height)
+            return pygame.Rect(self.global_x, self.global_y - self.title_bar_height, self.width, self.title_bar_height)
 
     def set_caption(self, caption):
         self.title = caption
@@ -111,35 +144,37 @@ class Panel:
         text.parent = self
         return self
 
-    def render(self, surface):
-        # If this panel is not fixed, draw the tittle bar and its caption onto the passed surface.
+    def keep_on_screen(self):
         if not self.fixed:
-            pygame.draw.rect(surface, (255, 255, 255), (self.local_x, self.local_y - 10, self.surface.get_width(), 10))
-            surface.blit(pygame.font.Font(None, 12).render(self.title, True, (0, 0, 0)), (self.local_x + 2, self.local_y - 9))
+            self.local_x = max(self.local_x, 0)
+            self.local_x = min(self.local_x, self.parent.width - self.width)
+            self.local_y = max(self.local_y, self.title_bar_height)
+            self.local_y = min(self.local_y, self.parent.height)
 
-        # Render self.surface before blitting it onto the passed surface.
-
-        # Clear panel surface
-        self.surface.fill(self.bgcolor)
+    def render(self, surface):
+        # Render the panel rect onto the passed surface.
+        pygame.draw.rect(surface, self.bgcolor, self.get_global_bounding_rect())
+        
+        # If this panel is not fixed, draw the title bar and its caption onto the passed surface.
+        if not self.fixed:
+            pygame.draw.rect(surface, (255, 255, 255), self.get_global_title_bar_rect())
+            surface.blit(pygame.font.Font(None, 12).render(self.title, True, (0, 0, 0)), (self.global_x + 2, self.global_y - 9))
 
         # Render child canvases
         for canvas in self.canvases:
-            canvas.render(self.surface)
+            canvas.render(surface)
 
         # Render child panels
         for panel in self.panels:
-            panel.render(self.surface)
+            panel.render(surface)
 
         # Render child buttons
         for button in self.buttons:
-            button.render(self.surface)
+            button.render(surface)
             
         # Render child text
         for text in self.text:
-            text.render(self.surface)
-
-        # Blit the panel surface (self.surface) onto the given surface (surface)
-        surface.blit(self.surface, (self.local_x, self.local_y))
+            text.render(surface)
 
     def mouse_moved(self, mouse_rel):
         # This function runs every frame the mouse moves.
@@ -193,11 +228,7 @@ class Panel:
         self.title_bar_held = False
 
         # To keep the title bar visible, ensure that the title bar is not dragged off the parent panel
-        if not self.fixed:
-            self.local_x = max(self.local_x, 0)
-            self.local_x = min(self.local_x, self.parent.surface.get_width() - self.surface.get_width())
-            self.local_y = max(self.local_y, self.title_bar_height)
-            self.local_y = min(self.local_y, self.parent.surface.get_height())
+        self.keep_on_screen()
 
         # Pass mouse up to child panels
         for panel in self.panels:
@@ -215,15 +246,9 @@ class Canvas:
         self.parent = None
 
         # Create rect object from rect argument.
-        rect = pygame.Rect(rect)
-
-        # Create the panel surface.
-        # Once created, the canvas size is fixed. (Consider changing this in future versions!)
-        self.surface = pygame.Surface(rect.size)
-
-        # Position of the canvas relative to the top left corner of its parent.
-        self.local_x = rect.x
-        self.local_y = rect.y
+        # Rect left (x) and top (y) values become the local x and y values for the canvas.
+        # Canvases need to be located at (0, 0) to work properly. This should be fixed later!
+        self.rect = pygame.Rect(rect)
 
         self.zoom = 1 # zoom < 1 means zoomed out. zoom > 1 means zoomed in.
         self.scroll = [0, 0]
@@ -234,6 +259,46 @@ class Canvas:
 
         # True when the brush is being painted on the canvas.
         self.brush_down = False
+
+    @property
+    def size(self):
+        return self.rect.size
+
+    @size.setter
+    def size(self, value):
+        self.rect.size = value
+
+    @property
+    def width(self):
+        return self.rect.width
+
+    @width.setter
+    def width(self, value):
+        self.rect.width = value
+
+    @property
+    def height(self):
+        return self.rect.height
+
+    @height.setter
+    def height(self, value):
+        self.rect.height = value
+        
+    @property
+    def local_x(self):
+        return self.rect.x
+
+    @local_x.setter
+    def local_x(self, value):
+        self.rect.x = value
+
+    @property
+    def local_y(self):
+        return self.rect.y
+
+    @local_y.setter
+    def local_y(self, value):
+        self.rect.y = value
 
     def get_local_pos(self):
         return (self.local_x, self.local_y)
@@ -254,10 +319,10 @@ class Canvas:
         return self.get_global_pos()[1]
     
     def get_local_bounding_rect(self):
-        return pygame.Rect(self.local_x, self.local_y, self.surface.get_width(), self.surface.get_height())
+        return self.rect
 
     def get_global_bounding_rect(self):
-        return pygame.Rect(self.global_x, self.global_y, self.surface.get_width(), self.surface.get_height())
+        return pygame.Rect(self.get_global_pos(), self.size)
 
     def get_coords_text(self):
         # Returns the coordinates of the mouse position on the canvas as text.
@@ -325,13 +390,10 @@ class Canvas:
             self.scroll[0] %= -scaled_image.get_width()
             self.scroll[1] %= -scaled_image.get_height()
 
-            # Tile and draw the image
+            # Tile and draw the image onto the passed surface.
             for y in range(math.ceil(surface.get_height() / self.loaded_image.get_height() / self.zoom) + 2):
                 for x in range(math.ceil(surface.get_width() / self.loaded_image.get_width() / self.zoom) + 2):
-                    self.surface.blit(scaled_image, (x * math.floor(self.loaded_image.get_width() * self.zoom) + self.scroll[0], y * math.floor(self.loaded_image.get_height() * self.zoom) + self.scroll[1]))
-
-            # The rendered self.surface is blitted it onto the passed surface.
-            surface.blit(self.surface, self.get_local_pos())
+                    surface.blit(scaled_image, (x * math.floor(self.loaded_image.get_width() * self.zoom) + self.scroll[0], y * math.floor(self.loaded_image.get_height() * self.zoom) + self.scroll[1]))
 
     def mouse_moved(self, mouse_rel):
         # Mouse position relative to the top left corner of the canvas
@@ -413,6 +475,46 @@ class Button:
         self.action = action
         self.label = label
         
+    @property
+    def size(self):
+        return self.rect.size
+
+    @size.setter
+    def size(self, value):
+        self.rect.size = value
+
+    @property
+    def width(self):
+        return self.rect.width
+
+    @width.setter
+    def width(self, value):
+        self.rect.width = value
+
+    @property
+    def height(self):
+        return self.rect.height
+
+    @height.setter
+    def height(self, value):
+        self.rect.height = value
+        
+    @property
+    def local_x(self):
+        return self.rect.x
+
+    @local_x.setter
+    def local_x(self, value):
+        self.rect.x = value
+
+    @property
+    def local_y(self):
+        return self.rect.y
+
+    @local_y.setter
+    def local_y(self, value):
+        self.rect.y = value
+
     def get_local_pos(self):
         return (self.local_x, self.local_y)
 
@@ -431,6 +533,12 @@ class Button:
     def global_y(self):
         return self.get_global_pos()[1]
 
+    def get_local_bounding_rect(self):
+        return self.rect
+
+    def get_global_bounding_rect(self):
+        return pygame.Rect(self.get_global_pos(), self.size)
+
     def render(self, surface):
         # Mouse position relative to the top left corner of the parent
         mouse_pos = (pygame.mouse.get_pos()[0] - self.parent.global_x, pygame.mouse.get_pos()[1] - self.parent.global_y)
@@ -442,10 +550,10 @@ class Button:
             color = (63, 0, 0)
 
         # Draw button bounding rect
-        pygame.draw.rect(surface, color, self.rect)
+        pygame.draw.rect(surface, color, self.get_global_bounding_rect())
 
         # Draw button label
-        surface.blit(pygame.font.Font(None, 16).render(self.label, True, (255, 255, 255)), (self.rect.x + 4, self.rect.y + 3))
+        surface.blit(pygame.font.Font(None, 16).render(self.label, True, (255, 255, 255)), (self.global_x + 4, self.global_y + 3))
 
     def left_mouse_down(self):
         # Mouse position relative to the top left corner of the parent
@@ -500,7 +608,7 @@ class Text:
             message = self.message
 
         # Render the text
-        surface.blit(pygame.font.Font(None, self.size).render(message, True, self.color), self.get_local_pos())
+        surface.blit(pygame.font.Font(None, self.size).render(message, True, self.color), self.get_global_pos())
 
 # Works with transparency
 def overlay_pixel(image_source, pos, color):
@@ -562,14 +670,11 @@ def main():
     # Initialize pygame
     pygame.init()
     pygame.display.set_caption("Tile Art Helper")
-    display = pygame.display.set_mode((640, 360), pygame.SCALED)
+    display = pygame.display.set_mode((640, 360), pygame.RESIZABLE)
 
 
     # Create root (main) panel
-    main_panel = Panel((0, 0, 0, 0), True, (0, 0, 0))
-
-    # Set the main panel to render directly to the display surface
-    main_panel.surface = display
+    main_panel = Panel(((0, 0), display.get_size()), True, (0, 0, 0))
 
 
     # Create the main canvas and make it a child of the main panel
@@ -637,6 +742,21 @@ def main():
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
+            if event.type == pygame.VIDEORESIZE:
+                # When the window is resized, resize and move every UI element that is based on the display size.
+                main_panel.size = display.get_size()
+                
+                canvas.size = display.get_size()
+                
+                top_panel.width = display.get_width()
+                
+                bottom_panel.local_y = display.get_height() - 15
+                bottom_panel.width = display.get_width()
+                zoom_text.local_x = display.get_width() - 80
+                increment_zoom_button.local_x = display.get_width() - 30
+                decrement_zoom_button.local_x = display.get_width() - 95
+
+                tools_panel.keep_on_screen()
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     running = False
