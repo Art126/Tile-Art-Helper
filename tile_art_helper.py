@@ -1,4 +1,4 @@
-## Tile Art Helper v0.3.3
+## Tile Art Helper v0.3.4
 ## Author: Alexander Art
 
 import pygame, tkinter, math
@@ -326,13 +326,18 @@ class Canvas:
 
     def get_coords_text(self):
         # Returns the coordinates of the mouse position on the canvas as text.
-        # This assumes that the canvas is at (0, 0). Temporary solution!
-        if self.image_loaded:
-            pos_x = int((pygame.mouse.get_pos()[0] - self.scroll[0]) % (math.floor(self.loaded_image.get_width() * self.zoom)) / self.zoom)
-            pos_y = int((pygame.mouse.get_pos()[1] - self.scroll[1]) % (math.floor(self.loaded_image.get_height() * self.zoom)) / self.zoom)
-            return f"Mouse position: ({pos_x}, {pos_y})"
-        else:
+
+        # Mouse position relative to the top left corner of the canvas
+        mouse_pos = (pygame.mouse.get_pos()[0] - self.global_x, pygame.mouse.get_pos()[1] - self.global_y)
+
+        if not self.image_loaded:
             return "No image loaded"
+        elif not self.brush_down and not self.get_global_bounding_rect().collidepoint(pygame.mouse.get_pos()):
+            return ""
+
+        pos_x = int((mouse_pos[0] - self.scroll[0]) % (math.floor(self.loaded_image.get_width() * self.zoom)) / self.zoom)
+        pos_y = int((mouse_pos[1] - self.scroll[1]) % (math.floor(self.loaded_image.get_height() * self.zoom)) / self.zoom)
+        return f"Mouse position: ({pos_x}, {pos_y})"            
 
     def get_zoom_text(self):
         # Used by text objects to stay updated with the zoom level even as the self.zoom variable changes.
@@ -380,8 +385,11 @@ class Canvas:
                 print(f"Invalid file format. Try '.png'")
 
     def render(self, surface):
-        # Render the loaded image
+        # Render and tile the loaded image onto the passed surface.
         if self.image_loaded:
+            # Create a surface to render and tile the loaded image within a fixed region.
+            temporary_surface = pygame.Surface(self.size)
+            
             # Scale the loaded image to be rendered
             # This gets laggy when zoomed in due to large image sizes. This should be fixed in future versions.
             scaled_image = pygame.transform.scale(self.loaded_image, (self.loaded_image.get_width() * self.zoom, self.loaded_image.get_height() * self.zoom))
@@ -390,10 +398,13 @@ class Canvas:
             self.scroll[0] %= -scaled_image.get_width()
             self.scroll[1] %= -scaled_image.get_height()
 
-            # Tile and draw the image onto the passed surface.
+            # Tile and draw the image onto the temporary surface.
             for y in range(math.ceil(surface.get_height() / self.loaded_image.get_height() / self.zoom) + 2):
                 for x in range(math.ceil(surface.get_width() / self.loaded_image.get_width() / self.zoom) + 2):
-                    surface.blit(scaled_image, (x * math.floor(self.loaded_image.get_width() * self.zoom) + self.scroll[0], y * math.floor(self.loaded_image.get_height() * self.zoom) + self.scroll[1]))
+                    temporary_surface.blit(scaled_image, (x * math.floor(self.loaded_image.get_width() * self.zoom) + self.scroll[0], y * math.floor(self.loaded_image.get_height() * self.zoom) + self.scroll[1]))
+
+            # Render the temporary surface onto the passed surface.
+            surface.blit(temporary_surface, self.get_global_pos())
 
     def mouse_moved(self, mouse_rel):
         # Mouse position relative to the top left corner of the canvas
@@ -429,7 +440,8 @@ class Canvas:
                                 self.loaded_image.set_at((pos_x, pos_y), brush_color)
             
     def left_mouse_down(self):
-        if not clicks_blocked:
+        # If the mouse is within the canvas and clicks are not blocked
+        if self.get_global_bounding_rect().collidepoint(pygame.mouse.get_pos()) and not clicks_blocked:
             # The canvas was pressed, so the brush is down
             self.brush_down = True
             
@@ -560,7 +572,7 @@ class Button:
         mouse_pos = (pygame.mouse.get_pos()[0] - self.parent.global_x, pygame.mouse.get_pos()[1] - self.parent.global_y)
 
         # If this button is pressed, run its function.
-        if self.rect.collidepoint(mouse_pos):
+        if self.get_local_bounding_rect().collidepoint(mouse_pos):
             self.action()
 
 class Text:
