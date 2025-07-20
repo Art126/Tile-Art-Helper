@@ -1,4 +1,4 @@
-## Tile Art Helper v0.3.4
+## Tile Art Helper v0.3.5
 ## Author: Alexander Art
 
 import pygame, tkinter, math
@@ -21,6 +21,9 @@ class Panel:
         # True if the panel should be fixed and not have a title bar.
         # False if the panel should have a title bar and be movable.
         self.fixed = fixed
+
+        # True if the mouse is hovering over the panel and the panel is not being covered by something else on a higher layer
+        self.is_hovered = False
 
         # Can be set with .set_caption()
         self.title = ""
@@ -160,6 +163,10 @@ class Panel:
             pygame.draw.rect(surface, (255, 255, 255), self.get_global_title_bar_rect())
             surface.blit(pygame.font.Font(None, 12).render(self.title, True, (0, 0, 0)), (self.global_x + 2, self.global_y - 9))
 
+        # Note that there is an inconsistency in the order of how the children are rendered:
+        # Child panels are rendered below child buttons, but child panels can cover child buttons from being pressed.
+        # There are no cases yet where a panel has both child panels and child buttons, so it has not yet been decided which should be on top.
+
         # Render child canvases
         for canvas in self.canvases:
             canvas.render(surface)
@@ -175,6 +182,35 @@ class Panel:
         # Render child text
         for text in self.text:
             text.render(surface)
+
+    def mouse_over(self, hovered):
+        # Runs every frame. Set self.is_hovered and calculate which child elements are being hovered by the mouse.
+        # hovered is True only if the mouse is over this panel and is not being blocked by a UI element on a higher layer.
+        # If self.is_hovered is False, then all children will also have is_hovered set to False.
+        
+        self.is_hovered = hovered
+
+        # Pass mouse hover to only the top UI element that the mouse is over
+        # Layer order, sequentially up the list of each: panels, buttons, canvases
+        element_found = False
+        for index, panel in enumerate(reversed(self.panels)):
+            if self.is_hovered and panel.get_global_bounding_rect().collidepoint(pygame.mouse.get_pos()) and not element_found:
+                panel.mouse_over(True)
+                element_found = True
+            else:
+                panel.mouse_over(False)
+        for index, button in enumerate(reversed(self.buttons)):
+            if self.is_hovered and button.get_global_bounding_rect().collidepoint(pygame.mouse.get_pos()) and not element_found:
+                button.mouse_over(True)
+                element_found = True
+            else:
+                button.mouse_over(False)
+        for index, canvas in enumerate(reversed(self.canvases)):
+            if self.is_hovered and canvas.get_global_bounding_rect().collidepoint(pygame.mouse.get_pos()) and not element_found:
+                canvas.mouse_over(True)
+                element_found = True
+            else:
+                canvas.mouse_over(False)
 
     def mouse_moved(self, mouse_rel):
         # This function runs every frame the mouse moves.
@@ -197,30 +233,27 @@ class Panel:
     def left_mouse_down(self):
         # This function runs on the left mousedown event.
 
-        if not clicks_blocked:
-            # Detect when title bar is visible and is pressed
-            if not self.fixed:
-                if self.get_global_title_bar_rect().collidepoint(pygame.mouse.get_pos()):
-                    self.title_bar_held = True
+        # If this panel was clicked, has a parent, and is not fixed, then move it to the top layer of panels
+        if self.is_hovered and self.parent is not None and not self.fixed:
+            self.parent.panels.remove(self)
+            self.parent.panels.append(self)
+            
+        # Detect when title bar is visible and is pressed
+        if not self.fixed:
+            if self.is_hovered and self.get_global_title_bar_rect().collidepoint(pygame.mouse.get_pos()):
+                self.title_bar_held = True
 
-            # Pass mouse press to child panels
-            for panel in self.panels:
-                panel.left_mouse_down()
+        # Pass mouse press to child panels
+        for panel in self.panels:
+            panel.left_mouse_down()
 
-            # Child panels cover child canvases and can block them from being pressed
-            for panel in self.panels:
-                # Detect overlap
-                if panel.get_global_bounding_rect().collidepoint(pygame.mouse.get_pos()):
-                    break
-            else:
-                # Only runs if no child panels were pressed
-                # Pass mouse press to child canvases
-                for canvas in self.canvases:
-                    canvas.left_mouse_down()
+        # Child panels cover child canvases and can block them from being pressed
+        for canvas in self.canvases:
+            canvas.left_mouse_down()
 
-            # Pass mouse press to child buttons
-            for button in self.buttons:
-                button.left_mouse_down()
+        # Pass mouse press to child buttons
+        for button in self.buttons:
+            button.left_mouse_down()
 
     def left_mouse_up(self):
         # This function runs on the left mouseup event.
@@ -247,8 +280,10 @@ class Canvas:
 
         # Create rect object from rect argument.
         # Rect left (x) and top (y) values become the local x and y values for the canvas.
-        # Canvases need to be located at (0, 0) to work properly. This should be fixed later!
         self.rect = pygame.Rect(rect)
+
+        # True if the mouse is hovering over the canvas and the canvas is not being covered by something else on a higher layer
+        self.is_hovered = False
 
         self.zoom = 1 # zoom < 1 means zoomed out. zoom > 1 means zoomed in.
         self.scroll = [0, 0]
@@ -352,9 +387,13 @@ class Canvas:
         self.zoom = max(0.1, self.zoom)
 
     def open_file(self):
-        # Block clicks before opening filedialog
-        global clicks_blocked
-        clicks_blocked = True
+        # Block mouse before opening filedialog
+        root = self
+        while root.parent is not None: # Find root parent
+            root = root.parent
+        # Tell the root parent (which will tell the whole hierarchy) that the mouse is not hovering over it
+        # This will block all mouse clicks until the next time the root has mouse_over() updated (which happens every frame)
+        root.mouse_over(False) 
         
         filepath = tkinter.filedialog.askopenfilename()
         try:
@@ -372,9 +411,13 @@ class Canvas:
 
     def save_as(self):
         if self.image_loaded:
-            # Block clicks before opening filedialog
-            global clicks_blocked
-            clicks_blocked = True
+            # Block mouse before opening filedialog
+            root = self
+            while root.parent is not None: # Find root parent
+                root = root.parent
+            # Tell the root parent (which will tell the whole hierarchy) that the mouse is not hovering over it
+            # This will block all mouse clicks until the next time the root has mouse_over() updated (which happens every frame)
+            root.mouse_over(False) 
             
             filepath = filedialog.asksaveasfilename()
             try:
@@ -405,6 +448,11 @@ class Canvas:
 
             # Render the temporary surface onto the passed surface.
             surface.blit(temporary_surface, self.get_global_pos())
+
+    def mouse_over(self, hovered):
+        # Runs every frame. Set self.is_hovered.
+        # hovered is True only if the mouse is over this canvas and is not being blocked by a UI element on a higher layer.        
+        self.is_hovered = hovered
 
     def mouse_moved(self, mouse_rel):
         # Mouse position relative to the top left corner of the canvas
@@ -440,8 +488,13 @@ class Canvas:
                                 self.loaded_image.set_at((pos_x, pos_y), brush_color)
             
     def left_mouse_down(self):
-        # If the mouse is within the canvas and clicks are not blocked
-        if self.get_global_bounding_rect().collidepoint(pygame.mouse.get_pos()) and not clicks_blocked:
+        # If the canvas was clicked
+        if self.is_hovered:
+            # If this canvas has a parent, move it to the top layer of canvases
+            if self.parent is not None:
+                self.parent.canvases.remove(self)
+                self.parent.canvases.append(self)
+                
             # The canvas was pressed, so the brush is down
             self.brush_down = True
             
@@ -486,6 +539,9 @@ class Button:
         self.rect = pygame.Rect(rect) # Relative to parent
         self.action = action
         self.label = label
+
+        # True if the mouse is hovering over the button and the button is not being covered by something else on a higher layer
+        self.is_hovered = False
         
     @property
     def size(self):
@@ -556,7 +612,7 @@ class Button:
         mouse_pos = (pygame.mouse.get_pos()[0] - self.parent.global_x, pygame.mouse.get_pos()[1] - self.parent.global_y)
 
         # Change the button color if it is being hovered
-        if self.rect.collidepoint(mouse_pos):
+        if self.is_hovered:
             color = (255, 127, 63)
         else:
             color = (63, 0, 0)
@@ -567,12 +623,21 @@ class Button:
         # Draw button label
         surface.blit(pygame.font.Font(None, 16).render(self.label, True, (255, 255, 255)), (self.global_x + 4, self.global_y + 3))
 
-    def left_mouse_down(self):
-        # Mouse position relative to the top left corner of the parent
-        mouse_pos = (pygame.mouse.get_pos()[0] - self.parent.global_x, pygame.mouse.get_pos()[1] - self.parent.global_y)
+    def mouse_over(self, hovered):
+        # Runs every frame. Set self.is_hovered.
+        # hovered is True only if the mouse is over this button and is not being blocked by a UI element on a higher layer.        
+        self.is_hovered = hovered
 
+    def left_mouse_down(self):
+        # This function runs on the left mousedown event.
+        
+        # If this button was clicked and it has a parent, move it to the top layer of buttons
+        if self.is_hovered and self.parent is not None:
+            self.parent.buttons.remove(self)
+            self.parent.buttons.append(self)
+            
         # If this button is pressed, run its function.
-        if self.get_local_bounding_rect().collidepoint(mouse_pos):
+        if self.is_hovered:
             self.action()
 
 class Text:
@@ -665,9 +730,6 @@ brush = 'pixel'
 brush_color = (255, 0, 255, 255)
 brush_size = 5
 do_not_paint = False
-
-# Used for blocking input upon exiting filedialog
-clicks_blocked = False
 
 def main():
     print("INSTRUCTIONS:")
@@ -810,6 +872,9 @@ def main():
                 canvas.scroll[0] += (previous_scaled_mouse_pos[0] - new_scaled_mouse_pos[0]) * canvas.zoom
                 canvas.scroll[1] += (previous_scaled_mouse_pos[1] - new_scaled_mouse_pos[1]) * canvas.zoom
 
+        # Calculate which UI element(s) the mouse is hovering over (if any)
+        main_panel.mouse_over(main_panel.get_global_bounding_rect().collidepoint(pygame.mouse.get_pos()))
+
                         
         # Panning
 
@@ -821,17 +886,12 @@ def main():
         previous_mouse_pos = pygame.mouse.get_pos() # pygame.mouse.get_rel() does not take into account pygame.SCALED
         
 
-        # clicks_blocked is only needed for one frame.
-        global clicks_blocked
-        clicks_blocked = False
-        
-
         # Rendering
 
         # Clear display
         display.fill((0, 0, 0))
 
-        # Render main panel
+        # Render main panel and all its children
         main_panel.render(display)
 
         # Update pygame display and tick the pygame clock
