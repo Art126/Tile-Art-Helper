@@ -1,4 +1,4 @@
-## Tile Art Helper v0.3.5
+## Tile Art Helper v0.3.6
 ## Author: Alexander Art
 
 import pygame, tkinter, math
@@ -7,7 +7,7 @@ from tkinter import filedialog
 # Class for panel UIs
 class Panel:
     # If a panel is not fixed, it will have a title bar drawn above it so that it can be dragged around.
-    title_bar_height = 10
+    title_bar_height = 20
     
     def __init__(self, rect, fixed, bgcolor=(127, 63, 0)):
         # This panel's parent object. This gets set with parent.add_panel(self).
@@ -161,7 +161,7 @@ class Panel:
         # If this panel is not fixed, draw the title bar and its caption onto the passed surface.
         if not self.fixed:
             pygame.draw.rect(surface, (255, 255, 255), self.get_global_title_bar_rect())
-            surface.blit(pygame.font.Font(None, 12).render(self.title, True, (0, 0, 0)), (self.global_x + 2, self.global_y - 9))
+            surface.blit(pygame.font.Font(None, 24).render(self.title, True, (0, 0, 0)), (self.global_x + 3, self.global_y - 18))
 
         # Note that there is an inconsistency in the order of how the children are rendered:
         # Child panels are rendered below child buttons, but child panels can cover child buttons from being pressed.
@@ -621,7 +621,7 @@ class Button:
         pygame.draw.rect(surface, color, self.get_global_bounding_rect())
 
         # Draw button label
-        surface.blit(pygame.font.Font(None, 16).render(self.label, True, (255, 255, 255)), (self.global_x + 4, self.global_y + 3))
+        surface.blit(pygame.font.Font(None, 32).render(self.label, True, (255, 255, 255)), (self.global_x + 6, self.global_y + 6))
 
     def mouse_over(self, hovered):
         # Runs every frame. Set self.is_hovered.
@@ -744,7 +744,7 @@ def main():
     # Initialize pygame
     pygame.init()
     pygame.display.set_caption("Tile Art Helper")
-    display = pygame.display.set_mode((640, 360), pygame.RESIZABLE)
+    display = pygame.display.set_mode((1280, 720), pygame.RESIZABLE)
 
 
     # Create root (main) panel
@@ -757,55 +757,57 @@ def main():
 
 
     # Create a top panel and make it a child of the main panel
-    top_panel = Panel((0, 0, display.get_width(), 30), True)
+    top_panel = Panel((0, 0, display.get_width(), 60), True)
     main_panel.add_panel(top_panel)
 
     # Top panel save options
-    open_image_button = Button((2, 2, 80, 20), canvas.open_file, "Open Image")
+    open_image_button = Button((4, 4, 160, 40), canvas.open_file, "Open Image")
     top_panel.add_button(open_image_button)
-    save_overwrite_button = Button((102, 2, 80, 20), canvas.save_image, "Save")
+    save_overwrite_button = Button((204, 4, 160, 40), canvas.save_image, "Save")
     top_panel.add_button(save_overwrite_button)
-    save_overwrite_text = Text("Will overwrite previous!", 12, (255, 255, 255), (97, 22))
+    save_overwrite_text = Text("Will overwrite previous!", 20, (255, 255, 255), (208, 45))
     top_panel.add_text(save_overwrite_text)
-    save_as_button = Button((202, 2, 80, 20), canvas.save_as, "Save As")
+    save_as_button = Button((404, 4, 160, 40), canvas.save_as, "Save As")
     top_panel.add_button(save_as_button)
 
     
     # Create bottom panel and make it a child of the main panel
-    bottom_panel = Panel((0, display.get_height() - 15, display.get_width(), 15), True)
+    bottom_panel = Panel((0, display.get_height() - 30, display.get_width(), 30), True)
     main_panel.add_panel(bottom_panel)
 
     # Bottom panel coordinate text
-    coords_text = Text(canvas.get_coords_text, 12, (255, 255, 255), (4, 3))
+    coords_text = Text(canvas.get_coords_text, 24, (255, 255, 255), (8, 8))
     bottom_panel.add_text(coords_text)
 
     # Bottom panel zoom buttons and text
-    zoom_text = Text(canvas.get_zoom_text, 12, (255, 255, 255), (display.get_width() - 80, 3))
+    zoom_text = Text(canvas.get_zoom_text, 24, (255, 255, 255), (display.get_width() - 160, 8))
     bottom_panel.add_text(zoom_text)
-    increment_zoom_button = Button((display.get_width() - 30, 1, 13, 13), canvas.increment_zoom, "+")
+    increment_zoom_button = Button((display.get_width() - 60, 2, 26, 26), canvas.increment_zoom, "+")
     bottom_panel.add_button(increment_zoom_button)
-    decrement_zoom_button = Button((display.get_width() - 95, 1, 13, 13), canvas.decrement_zoom, "-")
+    decrement_zoom_button = Button((display.get_width() - 190, 2, 26, 26), canvas.decrement_zoom, "-")
     bottom_panel.add_button(decrement_zoom_button)
 
 
     # Create tools panel and make it a child of the main panel
-    tools_panel = Panel((display.get_width() - 110, 50, 100, 130), False).set_caption("Brush tools")
+    tools_panel = Panel((display.get_width() - 220, 100, 200, 280), False).set_caption("Brush tools")
     main_panel.add_panel(tools_panel)
 
     # Tools panel brush options
-    pixel_button = Button((10, 10, 80, 20), set_brush_pixel, "Pixel")
+    pixel_button = Button((20, 20, 160, 40), set_brush_pixel, "Pixel")
     tools_panel.add_button(pixel_button)
-    brush_button = Button((10, 40, 80, 20), set_brush_brush, "Brush")
+    brush_button = Button((20, 80, 160, 40), set_brush_brush, "Brush")
     tools_panel.add_button(brush_button)
-    circle_button = Button((10, 70, 80, 20), set_brush_circle, "Circle")
+    circle_button = Button((20, 140, 160, 40), set_brush_circle, "Circle")
     tools_panel.add_button(circle_button)
 
     # Tools panel brush size settings and text
-    brush_size_text = Text(get_brush_size_text, 16, (255, 255, 255), (45, 105))
+    brush_size_title_text = Text("Size", 32, (255, 255, 255), (72, 200))
+    tools_panel.add_text(brush_size_title_text)
+    brush_size_text = Text(get_brush_size_text, 32, (255, 255, 255), (90, 230))
     tools_panel.add_text(brush_size_text)
-    increase_brush_size_button = Button((70, 100, 20, 20), increase_brush_size, "+")
+    increase_brush_size_button = Button((140, 220, 40, 40), increase_brush_size, "+")
     tools_panel.add_button(increase_brush_size_button)
-    decrease_brush_size_button = Button((10, 100, 20, 20), decrease_brush_size, "-")
+    decrease_brush_size_button = Button((20, 220, 40, 40), decrease_brush_size, "-")
     tools_panel.add_button(decrease_brush_size_button)
 
 
@@ -824,11 +826,11 @@ def main():
                 
                 top_panel.width = display.get_width()
                 
-                bottom_panel.local_y = display.get_height() - 15
+                bottom_panel.local_y = display.get_height() - 30
                 bottom_panel.width = display.get_width()
-                zoom_text.local_x = display.get_width() - 80
-                increment_zoom_button.local_x = display.get_width() - 30
-                decrement_zoom_button.local_x = display.get_width() - 95
+                zoom_text.local_x = display.get_width() - 160
+                increment_zoom_button.local_x = display.get_width() - 60
+                decrement_zoom_button.local_x = display.get_width() - 190
 
                 tools_panel.keep_on_screen()
             if event.type == pygame.KEYDOWN:
