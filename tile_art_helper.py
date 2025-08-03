@@ -1,4 +1,4 @@
-## Tile Art Helper v0.3.6
+## Tile Art Helper v0.4.0
 ## Author: Alexander Art
 
 import pygame, tkinter, math
@@ -39,6 +39,7 @@ class Panel:
         self.panels = []
         self.canvases = [] # Needing several canvases is rare.
         self.buttons = []
+        self.sliders = []
         self.text = []
 
     @property
@@ -142,6 +143,11 @@ class Panel:
         button.parent = self
         return self
 
+    def add_slider(self, slider):
+        self.sliders.append(slider)
+        slider.parent = self
+        return self
+
     def add_text(self, text):
         self.text.append(text)
         text.parent = self
@@ -178,6 +184,10 @@ class Panel:
         # Render child buttons
         for button in self.buttons:
             button.render(surface)
+
+        # Render child sliders
+        for slider in self.sliders:
+            slider.render(surface)
             
         # Render child text
         for text in self.text:
@@ -191,7 +201,7 @@ class Panel:
         self.is_hovered = hovered
 
         # Pass mouse hover to only the top UI element that the mouse is over
-        # Layer order, sequentially up the list of each: panels, buttons, canvases
+        # Layer order, sequentially up the list of each: panels, buttons, sliders, canvases
         element_found = False
         for index, panel in enumerate(reversed(self.panels)):
             if self.is_hovered and panel.get_global_bounding_rect().collidepoint(pygame.mouse.get_pos()) and not element_found:
@@ -205,6 +215,12 @@ class Panel:
                 element_found = True
             else:
                 button.mouse_over(False)
+        for index, slider in enumerate(reversed(self.sliders)):
+            if self.is_hovered and slider.get_global_bounding_rect().collidepoint(pygame.mouse.get_pos()) and not element_found:
+                slider.mouse_over(True)
+                element_found = True
+            else:
+                slider.mouse_over(False)
         for index, canvas in enumerate(reversed(self.canvases)):
             if self.is_hovered and canvas.get_global_bounding_rect().collidepoint(pygame.mouse.get_pos()) and not element_found:
                 canvas.mouse_over(True)
@@ -230,6 +246,12 @@ class Panel:
             if not (mouse_rel[0] == 0 and mouse_rel[1] == 0):
                 canvas.mouse_moved(mouse_rel)
 
+        # Pass mouse move to child sliders
+        for slider in self.sliders:
+            # The mouse move does not need to be passed to the sliders if the mouse did not move
+            if not (mouse_rel[0] == 0 and mouse_rel[1] == 0):
+                slider.mouse_moved(mouse_rel)
+
     def left_mouse_down(self):
         # This function runs on the left mousedown event.
 
@@ -247,13 +269,17 @@ class Panel:
         for panel in self.panels:
             panel.left_mouse_down()
 
-        # Child panels cover child canvases and can block them from being pressed
+        # Pass mouse press to child canvases
         for canvas in self.canvases:
             canvas.left_mouse_down()
 
         # Pass mouse press to child buttons
         for button in self.buttons:
             button.left_mouse_down()
+
+        # Pass mouse press to child sliders
+        for slider in self.sliders:
+            slider.left_mouse_down()
 
     def left_mouse_up(self):
         # This function runs on the left mouseup event.
@@ -270,6 +296,10 @@ class Panel:
         # Pass mouse up to child canvases
         for canvas in self.canvases:
             canvas.left_mouse_up()
+
+        # Pass mouse up to child sliders
+        for slider in self.sliders:
+            slider.left_mouse_up()
 
 # Class for canvas UI element
 class Canvas:
@@ -589,9 +619,9 @@ class Button:
     def get_global_pos(self):
         if self.parent is not None:
             parent_pos = self.parent.get_global_pos() # Avoids redundant recursive calls
-            return (parent_pos[0] + self.rect.x, parent_pos[1] + self.rect.y)
+            return (parent_pos[0] + self.local_x, parent_pos[1] + self.local_y)
         else:
-            return (self.rect.x, self.rect.y)
+            return (self.local_x, self.local_y)
 
     @property
     def global_x(self):
@@ -687,6 +717,109 @@ class Text:
         # Render the text
         surface.blit(pygame.font.Font(None, self.size).render(message, True, self.color), self.get_global_pos())
 
+class Slider:
+    def __init__(self, pos, min_value, max_value, color=(0, 0, 0)):
+        # This slider's parent object. This gets set with parent.add_slider(self).
+        # If the parent is a pygame surface instead of a panel, self.parent should remain None and self.render() must be called explicitly.
+        self.parent = None
+
+        self.pos = pos
+        self.min_value = min_value
+        self.max_value = max_value
+        self.color = color
+
+        self.percentage = 0
+
+        self.is_hovered = False
+        self.is_held = False
+
+    @property
+    def size(self):
+        return (12, self.height)
+
+    @property
+    def width(self):
+        return 12
+
+    @property
+    def height(self):
+        return 60
+        
+    @property
+    def local_x(self):
+        return self.pos[0]
+
+    @local_x.setter
+    def local_x(self, value):
+        self.pos = (value, self.pos[1])
+
+    @property
+    def local_y(self):
+        return self.pos[1]
+
+    @local_y.setter
+    def local_y(self, value):
+        self.pos = (self.pos[0], value)
+
+    def get_local_pos(self):
+        return (self.local_x, self.local_y)
+
+    def get_global_pos(self):
+        if self.parent is not None:
+            parent_pos = self.parent.get_global_pos() # Avoids redundant recursive calls
+            return (parent_pos[0] + self.local_x, parent_pos[1] + self.local_y)
+        else:
+            return (self.local_x, self.local_y)
+
+    @property
+    def global_x(self):
+        return self.get_global_pos()[0]
+
+    @property
+    def global_y(self):
+        return self.get_global_pos()[1]
+
+    def get_local_bounding_rect(self):
+        return pygame.Rect(self.get_local_pos(), self.size)
+
+    def get_global_bounding_rect(self):
+        return pygame.Rect(self.get_global_pos(), self.size)
+
+    def get_value(self):
+        return self.min_value + self.percentage * (self.max_value - self.min_value)
+
+    def render(self, surface):
+        # Draw the filled in part
+        pygame.draw.rect(surface, self.color, (self.global_x + 3, self.global_y, 6, self.height))
+        # Draw the not filled in part
+        pygame.draw.rect(surface, (0, 0, 0), (self.global_x + 3, self.global_y, 6, (1 - self.percentage) * self.height))
+        # Draw the draggable part
+        pygame.draw.rect(surface, (255, 255, 255), (self.global_x, self.global_y + (1 - self.percentage) * (self.height - 6), self.width, 6))
+
+    def mouse_over(self, hovered):
+        # Runs every frame. Set self.is_hovered.
+        # hovered is True only if the mouse is over this slider and is not being blocked by a UI element on a higher layer.        
+        self.is_hovered = hovered
+
+    def mouse_moved(self, mouse_rel):
+        # Mouse position relative to the top left corner of the slider
+        mouse_pos = (pygame.mouse.get_pos()[0] - self.global_x, pygame.mouse.get_pos()[1] - self.global_y)
+        
+        if self.is_held:
+            self.percentage = min(max(0, 1 - (mouse_pos[1] - 3) / (self.height - 6)), 1)
+
+    def left_mouse_down(self):
+        # Mouse position relative to the top left corner of the slider
+        mouse_pos = (pygame.mouse.get_pos()[0] - self.global_x, pygame.mouse.get_pos()[1] - self.global_y)
+        
+        if self.is_hovered:
+            self.is_held = True
+            
+            self.percentage = min(max(0, 1 - (mouse_pos[1] - 3) / (self.height - 6)), 1)
+
+    def left_mouse_up(self):
+        self.is_held = False
+
 # Works with transparency
 def overlay_pixel(image_source, pos, color):
     # Get previous color to overlay
@@ -732,6 +865,8 @@ brush_size = 5
 do_not_paint = False
 
 def main():
+    global brush_color
+    
     print("INSTRUCTIONS:")
     print("Open an image file")
     print("Left click to paint")
@@ -789,7 +924,7 @@ def main():
 
 
     # Create tools panel and make it a child of the main panel
-    tools_panel = Panel((display.get_width() - 220, 100, 200, 280), False).set_caption("Brush tools")
+    tools_panel = Panel((display.get_width() - 220, 100, 200, 400), False).set_caption("Brush tools")
     main_panel.add_panel(tools_panel)
 
     # Tools panel brush options
@@ -809,6 +944,21 @@ def main():
     tools_panel.add_button(increase_brush_size_button)
     decrease_brush_size_button = Button((20, 220, 40, 40), decrease_brush_size, "-")
     tools_panel.add_button(decrease_brush_size_button)
+
+    # Color selector settings and text
+    brush_color_text = Text("Color", 32, brush_color, (70, 280))
+    tools_panel.add_text(brush_color_text)
+    brush_rgb_text = Text("R             G             B", 24, (255, 255, 255), (32, 300))
+    tools_panel.add_text(brush_rgb_text)
+    red_slider = Slider((32, 320), 0, 255, (255, 0, 0))
+    tools_panel.add_slider(red_slider)
+    red_slider.percentage = brush_color[0] / 255 # Set default red value
+    green_slider = Slider((96, 320), 0, 255, (0, 255, 0))
+    tools_panel.add_slider(green_slider)
+    green_slider.percentage = brush_color[1] / 255 # Set default green value
+    blue_slider = Slider((160, 320), 0, 255, (0, 0, 255))
+    tools_panel.add_slider(blue_slider)
+    blue_slider.percentage = brush_color[2] / 255 # Set default blue value
 
 
     # Frame loop (repeats every frame the program is open)
@@ -843,9 +993,11 @@ def main():
                     main_panel.left_mouse_down()
                 if event.button == 2:
                     if canvas.image_loaded:
-                        # Pick the color at the mouse position
-                        global brush_color
-                        brush_color = canvas.loaded_image.get_at((int((event.pos[0] - canvas.scroll[0]) % math.floor(canvas.loaded_image.get_width() * canvas.zoom) / canvas.zoom), int((event.pos[1] - canvas.scroll[1]) % math.floor(canvas.loaded_image.get_height() * canvas.zoom) / canvas.zoom)))
+                        # Pick the color at the mouse position (alpha not yet supported)
+                        new_color = canvas.loaded_image.get_at((int((event.pos[0] - canvas.scroll[0]) % math.floor(canvas.loaded_image.get_width() * canvas.zoom) / canvas.zoom), int((event.pos[1] - canvas.scroll[1]) % math.floor(canvas.loaded_image.get_height() * canvas.zoom) / canvas.zoom)))
+                        red_slider.percentage = new_color[0] / 255
+                        green_slider.percentage = new_color[1] / 255
+                        blue_slider.percentage = new_color[2] / 255
             if event.type == pygame.MOUSEBUTTONUP:
                 if event.button == 1:
                     main_panel.left_mouse_up()
@@ -886,6 +1038,11 @@ def main():
             canvas.scroll[1] += pygame.mouse.get_pos()[1] - previous_mouse_pos[1]
 
         previous_mouse_pos = pygame.mouse.get_pos() # pygame.mouse.get_rel() does not take into account pygame.SCALED
+
+
+        # Update brush color
+        brush_color = (red_slider.get_value(), green_slider.get_value(), blue_slider.get_value(), 255)
+        brush_color_text.color = brush_color
         
 
         # Rendering
