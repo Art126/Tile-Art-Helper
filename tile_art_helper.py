@@ -1,4 +1,4 @@
-## Tile Art Helper v0.4.0
+## Tile Art Helper v0.4.1
 ## Author: Alexander Art
 
 import pygame, tkinter, math
@@ -19,8 +19,12 @@ class Panel:
         self.rect = pygame.Rect(rect)
 
         # True if the panel should be fixed and not have a title bar.
-        # False if the panel should have a title bar and be movable.
+        # False if the panel should have a title bar, be movable, and be closable.
         self.fixed = fixed
+
+        # True when the panel is open
+        # False when the panel is closed
+        self.visible = True
 
         # True if the mouse is hovering over the panel and the panel is not being covered by something else on a higher layer
         self.is_hovered = False
@@ -124,6 +128,18 @@ class Panel:
         else:
             return pygame.Rect(self.global_x, self.global_y - self.title_bar_height, self.width, self.title_bar_height)
 
+    def get_local_close_button_rect(self):
+        if self.fixed:
+            return None
+        else:
+            return pygame.Rect(self.local_x + self.width - self.title_bar_height, self.local_y - self.title_bar_height, self.title_bar_height, self.title_bar_height)
+
+    def get_global_close_button_rect(self):
+        if self.fixed:
+            return None
+        else:
+            return pygame.Rect(self.global_x + self.width - self.title_bar_height, self.global_y - self.title_bar_height, self.title_bar_height, self.title_bar_height)
+
     def set_caption(self, caption):
         self.title = caption
         return self
@@ -160,14 +176,24 @@ class Panel:
             self.local_y = max(self.local_y, self.title_bar_height)
             self.local_y = min(self.local_y, self.parent.height)
 
+    def toggle_visibility(self):
+        if self.visible:
+            self.parent.panels.remove(self)
+            self.visible = False
+        else:
+            self.parent.add_panel(self)
+            self.visible = True
+
     def render(self, surface):
         # Render the panel rect onto the passed surface.
         pygame.draw.rect(surface, self.bgcolor, self.get_global_bounding_rect())
         
-        # If this panel is not fixed, draw the title bar and its caption onto the passed surface.
+        # If this panel is not fixed, draw the title bar, its caption, and the close button onto the passed surface.
         if not self.fixed:
             pygame.draw.rect(surface, (255, 255, 255), self.get_global_title_bar_rect())
-            surface.blit(pygame.font.Font(None, 24).render(self.title, True, (0, 0, 0)), (self.global_x + 3, self.global_y - 18))
+            surface.blit(pygame.font.Font(None, 24).render(self.title, True, (0, 0, 0)), (self.global_x + 3, self.global_y - self.title_bar_height + 2))
+            pygame.draw.rect(surface, (255, 0, 0), self.get_global_close_button_rect())
+            surface.blit(pygame.font.Font(None, 24).render('x', True, (255, 255, 255)), (self.global_x + self.width - self.title_bar_height + 6, self.global_y - self.title_bar_height + 2))
 
         # Note that there is an inconsistency in the order of how the children are rendered:
         # Child panels are rendered below child buttons, but child panels can cover child buttons from being pressed.
@@ -260,9 +286,12 @@ class Panel:
             self.parent.panels.remove(self)
             self.parent.panels.append(self)
             
-        # Detect when title bar is visible and is pressed
         if not self.fixed:
-            if self.is_hovered and self.get_global_title_bar_rect().collidepoint(pygame.mouse.get_pos()):
+            # Detect when the close button is pressed
+            # If it was not pressed, then detect when the title bar is pressed            
+            if self.is_hovered and self.get_global_close_button_rect().collidepoint(pygame.mouse.get_pos()):
+                self.toggle_visibility()
+            elif self.is_hovered and self.get_global_title_bar_rect().collidepoint(pygame.mouse.get_pos()):
                 self.title_bar_held = True
 
         # Pass mouse press to child panels
@@ -961,6 +990,11 @@ def main():
     blue_slider.percentage = brush_color[2] / 255 # Set default blue value
 
 
+    # Tools panel toggle visibility button
+    toggle_brush_tools_button = Button((display.get_width() - 164, 4, 160, 40), tools_panel.toggle_visibility, "Brush tools")
+    top_panel.add_button(toggle_brush_tools_button)
+
+
     # Frame loop (repeats every frame the program is open)
 
     running = True
@@ -981,6 +1015,7 @@ def main():
                 zoom_text.local_x = display.get_width() - 160
                 increment_zoom_button.local_x = display.get_width() - 60
                 decrement_zoom_button.local_x = display.get_width() - 190
+                toggle_brush_tools_button.local_x = display.get_width() - 164
 
                 tools_panel.keep_on_screen()
             if event.type == pygame.KEYDOWN:
