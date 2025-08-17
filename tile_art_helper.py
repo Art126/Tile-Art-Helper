@@ -1,4 +1,4 @@
-## Tile Art Helper v0.4.1
+## Tile Art Helper v0.4.2
 ## Author: Alexander Art
 
 import pygame, tkinter, math
@@ -854,8 +854,11 @@ def overlay_pixel(image_source, pos, color):
     # Get previous color to overlay
     previous_color = image_source.get_at(pos)
 
-    # Lazy color blending algorithm
-    new_color = ((previous_color[0] * (1 - color[3] / 255) + color[0] * color[3] / 255) // 1, (previous_color[1] * (1 - color[3] / 255) + color[1] * color[3] / 255) // 1, (previous_color[2] * (1 - color[3] / 255) + color[2] * color[3] / 255) // 1, previous_color[3])
+    # Color blending (I don't know how I should go about blending the transparency)
+    new_red = (previous_color[0] ** 2 * (1 - color[3] / 255) + color[0] ** 2 * color[3] / 255) ** (1 / 2)
+    new_green = (previous_color[1] ** 2 * (1 - color[3] / 255) + color[1] ** 2 * color[3] / 255) ** (1 / 2)
+    new_blue = (previous_color[2] ** 2 * (1 - color[3] / 255) + color[2] ** 2 * color[3] / 255) ** (1 / 2)
+    new_color = (new_red, new_green, new_blue, previous_color[3])
 
     # Set the pixel
     image_source.set_at(pos, new_color)
