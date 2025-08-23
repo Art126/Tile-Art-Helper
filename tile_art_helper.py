@@ -1,15 +1,38 @@
-## Tile Art Helper v0.4.2
+## Tile Art Helper v0.4.3
 ## Author: Alexander Art
 
 import pygame, tkinter, math
 from tkinter import filedialog
 
+# Class for UI element styles
+class Style:
+    def __init__(self,
+                 panel_bg_color=(127, 63, 0),
+                 panel_title_bar_color=(255, 255, 255),
+                 panel_title_bar_text_color=(0, 0, 0),
+                 panel_title_bar_text_size=24,
+                 panel_title_bar_height=20,
+                 button_default_bg_color=(63, 0, 0),
+                 button_hovered_bg_color=(255, 127, 63),
+                 button_default_text_color=(255, 255, 255),
+                 button_hovered_text_color=(255, 255, 255),
+                 button_text_size=32,
+                 button_text_padding=(9, 9)):
+        self.panel_bg_color = panel_bg_color
+        self.panel_title_bar_color = panel_title_bar_color
+        self.panel_title_bar_text_color = panel_title_bar_text_color
+        self.panel_title_bar_text_size = panel_title_bar_text_size
+        self.panel_title_bar_height = panel_title_bar_height
+        self.button_default_bg_color = button_default_bg_color
+        self.button_hovered_bg_color = button_hovered_bg_color
+        self.button_default_text_color = button_default_text_color
+        self.button_hovered_text_color = button_hovered_text_color
+        self.button_text_size = button_text_size
+        self.button_text_padding = button_text_padding
+
 # Class for panel UIs
 class Panel:
-    # If a panel is not fixed, it will have a title bar drawn above it so that it can be dragged around.
-    title_bar_height = 20
-    
-    def __init__(self, rect, fixed, bgcolor=(127, 63, 0)):
+    def __init__(self, rect, fixed, style=Style()):
         # This panel's parent object. This gets set with parent.add_panel(self).
         # If the parent is a pygame surface instead of a panel, self.parent should remain None and rendering/input functions must be called explicitly.
         self.parent = None
@@ -21,6 +44,9 @@ class Panel:
         # True if the panel should be fixed and not have a title bar.
         # False if the panel should have a title bar, be movable, and be closable.
         self.fixed = fixed
+
+        # Color and formatting of the panel
+        self.style = style
 
         # True when the panel is open
         # False when the panel is closed
@@ -35,16 +61,21 @@ class Panel:
         # If the panel is movable, this keeps track of when it is being moved.
         self.title_bar_held = False
 
-        # Background color of the panel.
-        # TODO: Implement color schemes.
-        self.bgcolor = bgcolor
-
         # Panels, canvases, buttons, and text may be added as child objects.
         self.panels = []
         self.canvases = [] # Needing several canvases is rare.
         self.buttons = []
         self.sliders = []
         self.text = []
+
+        if self.fixed:
+            self.close_button = None
+        else:
+            self.close_button = Button((self.width - self.style.panel_title_bar_height, -self.style.panel_title_bar_height, self.style.panel_title_bar_height, self.style.panel_title_bar_height),
+                                       self.toggle_visibility,
+                                       "x",
+                                       Style(button_default_bg_color=(255, 255, 255), button_hovered_bg_color=(255, 0, 0), button_default_text_color=(0, 0, 0), button_hovered_text_color=(255, 255, 255), button_text_size=self.style.panel_title_bar_text_size, button_text_padding=(5, 2)))
+            self.add_button(self.close_button)
 
     @property
     def size(self):
@@ -108,37 +139,25 @@ class Panel:
         if self.fixed:
             return self.rect
         else:
-            return pygame.Rect(self.local_x, self.local_y - self.title_bar_height, self.width, self.height + self.title_bar_height)
+            return pygame.Rect(self.local_x, self.local_y - self.style.panel_title_bar_height, self.width, self.height + self.style.panel_title_bar_height)
 
     def get_global_bounding_rect(self):
         if self.fixed:
             return pygame.Rect(self.get_global_pos(), self.size)
         else:
-            return pygame.Rect(self.global_x, self.global_y - self.title_bar_height, self.width, self.height + self.title_bar_height)
+            return pygame.Rect(self.global_x, self.global_y - self.style.panel_title_bar_height, self.width, self.height + self.style.panel_title_bar_height)
 
     def get_local_title_bar_rect(self):
         if self.fixed:
             return None
         else:
-            return pygame.Rect(self.local_x, self.local_y - self.title_bar_height, self.width, self.title_bar_height)
+            return pygame.Rect(self.local_x, self.local_y - self.style.panel_title_bar_height, self.width, self.style.panel_title_bar_height)
 
     def get_global_title_bar_rect(self):
         if self.fixed:
             return None
         else:
-            return pygame.Rect(self.global_x, self.global_y - self.title_bar_height, self.width, self.title_bar_height)
-
-    def get_local_close_button_rect(self):
-        if self.fixed:
-            return None
-        else:
-            return pygame.Rect(self.local_x + self.width - self.title_bar_height, self.local_y - self.title_bar_height, self.title_bar_height, self.title_bar_height)
-
-    def get_global_close_button_rect(self):
-        if self.fixed:
-            return None
-        else:
-            return pygame.Rect(self.global_x + self.width - self.title_bar_height, self.global_y - self.title_bar_height, self.title_bar_height, self.title_bar_height)
+            return pygame.Rect(self.global_x, self.global_y - self.style.panel_title_bar_height, self.width, self.style.panel_title_bar_height)
 
     def set_caption(self, caption):
         self.title = caption
@@ -173,27 +192,35 @@ class Panel:
         if not self.fixed:
             self.local_x = max(self.local_x, 0)
             self.local_x = min(self.local_x, self.parent.width - self.width)
-            self.local_y = max(self.local_y, self.title_bar_height)
+            self.local_y = max(self.local_y, self.style.panel_title_bar_height)
             self.local_y = min(self.local_y, self.parent.height)
 
     def toggle_visibility(self):
         if self.visible:
             self.parent.panels.remove(self)
             self.visible = False
+            # Update every child element
+            for panel in self.panels:
+                panel.mouse_over(False)
+                panel.visible = False
+            for button in self.buttons:
+                button.mouse_over(False)
+            for slider in self.sliders:
+                slider.mouse_over(False)
+            for canvas in self.canvases:
+                canvas.mouse_over(False)
         else:
             self.parent.add_panel(self)
             self.visible = True
 
     def render(self, surface):
         # Render the panel rect onto the passed surface.
-        pygame.draw.rect(surface, self.bgcolor, self.get_global_bounding_rect())
+        pygame.draw.rect(surface, self.style.panel_bg_color, self.get_global_bounding_rect())
         
-        # If this panel is not fixed, draw the title bar, its caption, and the close button onto the passed surface.
+        # If this panel is not fixed, draw the title bar and its caption onto the passed surface.
         if not self.fixed:
-            pygame.draw.rect(surface, (255, 255, 255), self.get_global_title_bar_rect())
-            surface.blit(pygame.font.Font(None, 24).render(self.title, True, (0, 0, 0)), (self.global_x + 3, self.global_y - self.title_bar_height + 2))
-            pygame.draw.rect(surface, (255, 0, 0), self.get_global_close_button_rect())
-            surface.blit(pygame.font.Font(None, 24).render('x', True, (255, 255, 255)), (self.global_x + self.width - self.title_bar_height + 6, self.global_y - self.title_bar_height + 2))
+            pygame.draw.rect(surface, self.style.panel_title_bar_color, self.get_global_title_bar_rect())
+            surface.blit(pygame.font.Font(None, self.style.panel_title_bar_text_size).render(self.title, True, self.style.panel_title_bar_text_color), (self.global_x + 3, self.global_y - self.style.panel_title_bar_height + 2))
 
         # Note that there is an inconsistency in the order of how the children are rendered:
         # Child panels are rendered below child buttons, but child panels can cover child buttons from being pressed.
@@ -287,27 +314,24 @@ class Panel:
             self.parent.panels.append(self)
             
         if not self.fixed:
-            # Detect when the close button is pressed
-            # If it was not pressed, then detect when the title bar is pressed            
-            if self.is_hovered and self.get_global_close_button_rect().collidepoint(pygame.mouse.get_pos()):
-                self.toggle_visibility()
-            elif self.is_hovered and self.get_global_title_bar_rect().collidepoint(pygame.mouse.get_pos()):
+            # If it was not pressed, then detect when the title bar is pressed
+            if self.is_hovered and self.get_global_title_bar_rect().collidepoint(pygame.mouse.get_pos()):
                 self.title_bar_held = True
 
         # Pass mouse press to child panels
-        for panel in self.panels:
+        for panel in self.panels[:]:
             panel.left_mouse_down()
 
         # Pass mouse press to child canvases
-        for canvas in self.canvases:
+        for canvas in self.canvases[:]:
             canvas.left_mouse_down()
 
         # Pass mouse press to child buttons
-        for button in self.buttons:
+        for button in self.buttons[:]:
             button.left_mouse_down()
 
         # Pass mouse press to child sliders
-        for slider in self.sliders:
+        for slider in self.sliders[:]:
             slider.left_mouse_down()
 
     def left_mouse_up(self):
@@ -590,7 +614,7 @@ class Canvas:
 
 # Class for button UI elements
 class Button:
-    def __init__(self, rect, action, label):
+    def __init__(self, rect, action, label, style=Style()):
         # This button's parent object. This gets set with parent.add_button(self).
         # If the parent is a pygame surface instead of a panel, self.parent should remain None and rendering/input functions must be called explicitly.
         self.parent = None
@@ -598,6 +622,9 @@ class Button:
         self.rect = pygame.Rect(rect) # Relative to parent
         self.action = action
         self.label = label
+
+        # Color and formatting of the button
+        self.style = style
 
         # True if the mouse is hovering over the button and the button is not being covered by something else on a higher layer
         self.is_hovered = False
@@ -672,15 +699,18 @@ class Button:
 
         # Change the button color if it is being hovered
         if self.is_hovered:
-            color = (255, 127, 63)
+            color = self.style.button_hovered_bg_color
         else:
-            color = (63, 0, 0)
+            color = self.style.button_default_bg_color
 
         # Draw button bounding rect
         pygame.draw.rect(surface, color, self.get_global_bounding_rect())
 
         # Draw button label
-        surface.blit(pygame.font.Font(None, 32).render(self.label, True, (255, 255, 255)), (self.global_x + 6, self.global_y + 6))
+        if self.is_hovered:
+            surface.blit(pygame.font.Font(None, self.style.button_text_size).render(self.label, True, self.style.button_hovered_text_color), (self.global_x + self.style.button_text_padding[0], self.global_y + self.style.button_text_padding[1]))
+        else:
+            surface.blit(pygame.font.Font(None, self.style.button_text_size).render(self.label, True, self.style.button_default_text_color), (self.global_x + self.style.button_text_padding[0], self.global_y + self.style.button_text_padding[1]))
 
     def mouse_over(self, hovered):
         # Runs every frame. Set self.is_hovered.
@@ -694,7 +724,7 @@ class Button:
         if self.is_hovered and self.parent is not None:
             self.parent.buttons.remove(self)
             self.parent.buttons.append(self)
-            
+    
         # If this button is pressed, run its function.
         if self.is_hovered:
             self.action()
@@ -838,11 +868,17 @@ class Slider:
             self.percentage = min(max(0, 1 - (mouse_pos[1] - 3) / (self.height - 6)), 1)
 
     def left_mouse_down(self):
-        # Mouse position relative to the top left corner of the slider
-        mouse_pos = (pygame.mouse.get_pos()[0] - self.global_x, pygame.mouse.get_pos()[1] - self.global_y)
-        
+        # If the slider was clicked
         if self.is_hovered:
+            # If this slider has a parent, move it to the top layer of sliders
+            if self.parent is not None:
+                self.parent.sliders.remove(self)
+                self.parent.sliders.append(self)
+            
             self.is_held = True
+
+            # Mouse position relative to the top left corner of the slider
+            mouse_pos = (pygame.mouse.get_pos()[0] - self.global_x, pygame.mouse.get_pos()[1] - self.global_y)
             
             self.percentage = min(max(0, 1 - (mouse_pos[1] - 3) / (self.height - 6)), 1)
 
@@ -915,7 +951,7 @@ def main():
 
 
     # Create root (main) panel
-    main_panel = Panel(((0, 0), display.get_size()), True, (0, 0, 0))
+    main_panel = Panel(((0, 0), display.get_size()), True, Style(panel_bg_color=(0, 0, 0)))
 
 
     # Create the main canvas and make it a child of the main panel
@@ -949,9 +985,9 @@ def main():
     # Bottom panel zoom buttons and text
     zoom_text = Text(canvas.get_zoom_text, 24, (255, 255, 255), (display.get_width() - 160, 8))
     bottom_panel.add_text(zoom_text)
-    increment_zoom_button = Button((display.get_width() - 60, 2, 26, 26), canvas.increment_zoom, "+")
+    increment_zoom_button = Button((display.get_width() - 60, 2, 26, 26), canvas.increment_zoom, "+", Style(button_text_padding=(6, 1)))
     bottom_panel.add_button(increment_zoom_button)
-    decrement_zoom_button = Button((display.get_width() - 190, 2, 26, 26), canvas.decrement_zoom, "-")
+    decrement_zoom_button = Button((display.get_width() - 190, 2, 26, 26), canvas.decrement_zoom, "-", Style(button_text_padding=(9, 2)))
     bottom_panel.add_button(decrement_zoom_button)
 
 
@@ -972,9 +1008,9 @@ def main():
     tools_panel.add_text(brush_size_title_text)
     brush_size_text = Text(get_brush_size_text, 32, (255, 255, 255), (90, 230))
     tools_panel.add_text(brush_size_text)
-    increase_brush_size_button = Button((140, 220, 40, 40), increase_brush_size, "+")
+    increase_brush_size_button = Button((140, 220, 40, 40), increase_brush_size, "+", Style(button_text_size=48, button_text_padding=(10, 1)))
     tools_panel.add_button(increase_brush_size_button)
-    decrease_brush_size_button = Button((20, 220, 40, 40), decrease_brush_size, "-")
+    decrease_brush_size_button = Button((20, 220, 40, 40), decrease_brush_size, "-", Style(button_text_size=48, button_text_padding=(14, 2)))
     tools_panel.add_button(decrease_brush_size_button)
 
     # Color selector settings and text
