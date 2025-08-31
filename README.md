@@ -1,7 +1,7 @@
 # Tile-Art-Helper
 Art program made for drawing tile assets.
 
-This program is in early development. Right now, the main function it serves is to assist in drawing tile assets that repeat seamlessly.
+This program is in early development. Its purpose is to assist in drawing tile textures that repeat seamlessly.
 
 ### To Run
 1. Have Python installed
@@ -9,9 +9,10 @@ This program is in early development. Right now, the main function it serves is 
 3. Run `tile_art_helper.py`
 
 ### Instructions
-Open an image using the "Open Image" button. Then:
+Once the program is running, open an image using the "Open Image" button.
+Once an image is open, you can edit the file:
 - Left click to paint
 - Middle click to use the color picker
-- Right click and drag to pan camera
+- Right click and drag to pan the camera
 - Scroll to zoom
 - Use the on-screen buttons for everything else
