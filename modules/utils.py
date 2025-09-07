@@ -13,10 +13,3 @@ def overlay_pixel(image_source, pos, color):
 
     # Set the pixel
     image_source.set_at(pos, new_color)
-
-## Globals (having the brush saved here is a temporary solution)
-# Set up global brush
-brush = 'pixel'
-brush_color = (255, 0, 255, 255)
-brush_size = 5
-do_not_paint = False

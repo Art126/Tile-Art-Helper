@@ -1,13 +1,15 @@
 ## Author: Alexander Art
 
-import pygame, tkinter, math
+import math
 from tkinter import filedialog
+
+import pygame
 
 import modules.utils
 
 # Class for canvas UI element
 class Canvas:
-    def __init__(self, rect):
+    def __init__(self, rect, brush):
         # This canvas's parent object. This gets set with parent.add_canvas(self).
         # If the parent is a pygame surface instead of a panel, self.parent should remain None and rendering/input functions must be called explicitly.
         self.parent = None
@@ -15,6 +17,9 @@ class Canvas:
         # Create rect object from rect argument.
         # Rect left (x) and top (y) values become the local x and y values for the canvas.
         self.rect = pygame.Rect(rect)
+
+        # Brush object for this canvas to read brush settings from
+        self.brush = brush
 
         # True if the mouse is hovering over the canvas and the canvas is not being covered by something else on a higher layer
         self.is_hovered = False
@@ -129,7 +134,7 @@ class Canvas:
         # This will block all mouse clicks until the next time the root has mouse_over() updated (which happens every frame)
         root.mouse_over(False) 
         
-        filepath = tkinter.filedialog.askopenfilename()
+        filepath = filedialog.askopenfilename()
         try:
             self.loaded_image = pygame.image.load(filepath).convert_alpha()
             self.open_filepath = filepath
@@ -203,23 +208,23 @@ class Canvas:
             for i in range(max(1, int(mouse_move_distance / spacing))):
                 center_pos_x = int((mouse_pos[0] - i * space[0] - self.scroll[0]) % (math.floor(self.loaded_image.get_width() * self.zoom)) / self.zoom)
                 center_pos_y = int((mouse_pos[1] - i * space[1] - self.scroll[1]) % (math.floor(self.loaded_image.get_height() * self.zoom)) / self.zoom)
-                if modules.utils.brush == 'pixel':
-                    self.loaded_image.set_at((center_pos_x, center_pos_y), modules.utils.brush_color)
-                elif modules.utils.brush == 'brush':
-                    for dy in range(modules.utils.brush_size * 2 + 1):
-                        for dx in range(modules.utils.brush_size * 2 + 1):
-                            pos_x = (center_pos_x + dx - modules.utils.brush_size) % self.loaded_image.get_width()
-                            pos_y = (center_pos_y + dy - modules.utils.brush_size) % self.loaded_image.get_height()
-                            point_distance = math.dist(mouse_pos, (mouse_pos[0] + dx - modules.utils.brush_size, mouse_pos[1] + dy - modules.utils.brush_size))
-                            if point_distance <= modules.utils.brush_size:
-                                modules.utils.overlay_pixel(self.loaded_image, (pos_x, pos_y), (modules.utils.brush_color[0], modules.utils.brush_color[1], modules.utils.brush_color[2], modules.utils.brush_color[3] * (1 - point_distance / modules.utils.brush_size)))
-                elif modules.utils.brush == 'circle':
-                    for dy in range(modules.utils.brush_size * 2 + 1):
-                        for dx in range(modules.utils.brush_size * 2 + 1):
-                            if math.dist(mouse_pos, (mouse_pos[0] + dx - modules.utils.brush_size, mouse_pos[1] + dy - modules.utils.brush_size)) <= modules.utils.brush_size:
-                                pos_x = (center_pos_x + dx - modules.utils.brush_size) % self.loaded_image.get_width()
-                                pos_y = (center_pos_y + dy - modules.utils.brush_size) % self.loaded_image.get_height()
-                                self.loaded_image.set_at((pos_x, pos_y), modules.utils.brush_color)
+                if self.brush.shape == 'pixel':
+                    self.loaded_image.set_at((center_pos_x, center_pos_y), self.brush.color)
+                elif self.brush.shape == 'brush':
+                    for dy in range(self.brush.size * 2 + 1):
+                        for dx in range(self.brush.size * 2 + 1):
+                            pos_x = (center_pos_x + dx - self.brush.size) % self.loaded_image.get_width()
+                            pos_y = (center_pos_y + dy - self.brush.size) % self.loaded_image.get_height()
+                            point_distance = math.dist(mouse_pos, (mouse_pos[0] + dx - self.brush.size, mouse_pos[1] + dy - self.brush.size))
+                            if point_distance <= self.brush.size:
+                                modules.utils.overlay_pixel(self.loaded_image, (pos_x, pos_y), (self.brush.color[0], self.brush.color[1], self.brush.color[2], self.brush.color[3] * (1 - point_distance / self.brush.size)))
+                elif self.brush.shape == 'circle':
+                    for dy in range(self.brush.size * 2 + 1):
+                        for dx in range(self.brush.size * 2 + 1):
+                            if math.dist(mouse_pos, (mouse_pos[0] + dx - self.brush.size, mouse_pos[1] + dy - self.brush.size)) <= self.brush.size:
+                                pos_x = (center_pos_x + dx - self.brush.size) % self.loaded_image.get_width()
+                                pos_y = (center_pos_y + dy - self.brush.size) % self.loaded_image.get_height()
+                                self.loaded_image.set_at((pos_x, pos_y), self.brush.color)
             
     def left_mouse_down(self):
         # If the canvas was clicked
@@ -241,23 +246,23 @@ class Canvas:
                 center_pos_x = int((mouse_pos[0] - self.scroll[0]) % (math.floor(self.loaded_image.get_width() * self.zoom)) / self.zoom)
                 center_pos_y = int((mouse_pos[1] - self.scroll[1]) % (math.floor(self.loaded_image.get_height() * self.zoom)) / self.zoom)
                 # Paint
-                if modules.utils.brush == 'pixel':
-                    self.loaded_image.set_at((center_pos_x, center_pos_y), modules.utils.brush_color)
-                elif modules.utils.brush == 'brush':
-                    for dy in range(modules.utils.brush_size * 2 + 1):
-                        for dx in range(modules.utils.brush_size * 2 + 1):
-                            pos_x = (center_pos_x + dx - modules.utils.brush_size) % self.loaded_image.get_width()
-                            pos_y = (center_pos_y + dy - modules.utils.brush_size) % self.loaded_image.get_height()
-                            point_distance = math.dist(mouse_pos, (mouse_pos[0] + dx - modules.utils.brush_size, mouse_pos[1] + dy - modules.utils.brush_size))
-                            if point_distance <= modules.utils.brush_size:
-                                modules.utils.overlay_pixel(self.loaded_image, (pos_x, pos_y), (modules.utils.brush_color[0], modules.utils.brush_color[1], modules.utils.brush_color[2], modules.utils.brush_color[3] * (1 - point_distance / modules.utils.brush_size)))
-                elif modules.utils.brush == 'circle':
-                    for dy in range(modules.utils.brush_size * 2 + 1):
-                        for dx in range(modules.utils.brush_size * 2 + 1):
-                            if math.dist(mouse_pos, (mouse_pos[0] + dx - modules.utils.brush_size, mouse_pos[1] + dy - modules.utils.brush_size)) <= modules.utils.brush_size:
-                                pos_x = (center_pos_x + dx - modules.utils.brush_size) % self.loaded_image.get_width()
-                                pos_y = (center_pos_y + dy - modules.utils.brush_size) % self.loaded_image.get_height()
-                                self.loaded_image.set_at((pos_x, pos_y), modules.utils.brush_color)
+                if self.brush.shape == 'pixel':
+                    self.loaded_image.set_at((center_pos_x, center_pos_y), self.brush.color)
+                elif self.brush.shape == 'brush':
+                    for dy in range(self.brush.size * 2 + 1):
+                        for dx in range(self.brush.size * 2 + 1):
+                            pos_x = (center_pos_x + dx - self.brush.size) % self.loaded_image.get_width()
+                            pos_y = (center_pos_y + dy - self.brush.size) % self.loaded_image.get_height()
+                            point_distance = math.dist(mouse_pos, (mouse_pos[0] + dx - self.brush.size, mouse_pos[1] + dy - self.brush.size))
+                            if point_distance <= self.brush.size:
+                                modules.utils.overlay_pixel(self.loaded_image, (pos_x, pos_y), (self.brush.color[0], self.brush.color[1], self.brush.color[2], self.brush.color[3] * (1 - point_distance / self.brush.size)))
+                elif self.brush.shape == 'circle':
+                    for dy in range(self.brush.size * 2 + 1):
+                        for dx in range(self.brush.size * 2 + 1):
+                            if math.dist(mouse_pos, (mouse_pos[0] + dx - self.brush.size, mouse_pos[1] + dy - self.brush.size)) <= self.brush.size:
+                                pos_x = (center_pos_x + dx - self.brush.size) % self.loaded_image.get_width()
+                                pos_y = (center_pos_y + dy - self.brush.size) % self.loaded_image.get_height()
+                                self.loaded_image.set_at((pos_x, pos_y), self.brush.color)
 
     def left_mouse_up(self):
         # The mouse was released, so the brush is not down

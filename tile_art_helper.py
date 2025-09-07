@@ -1,37 +1,17 @@
-## Tile Art Helper v0.4.4
+## Tile Art Helper v0.4.5
 ## Author: Alexander Art
 
-import pygame, math
+import math
 
-import modules.utils
+import pygame
+
+from modules.brush import Brush
 from modules.ui.ui_style import Style
 from modules.ui.panel import Panel
 from modules.ui.canvas import Canvas
 from modules.ui.button import Button
 from modules.ui.text import Text
 from modules.ui.slider import Slider
-
-def get_brush_size_text():
-    return str(modules.utils.brush_size)
-
-# Set brush to pixel mode
-def set_brush_pixel():
-    modules.utils.brush = 'pixel'
-
-# Set brush to brush mode (softer than circle mode)
-def set_brush_brush():
-    modules.utils.brush = 'brush'
-
-# Set brush to circle mode
-def set_brush_circle():
-    modules.utils.brush = 'circle'
-
-def increase_brush_size():
-    modules.utils.brush_size += 1
-
-def decrease_brush_size():
-    modules.utils.brush_size -= 1
-    modules.utils.brush_size = max(1, modules.utils.brush_size)
 
 def main():
     print("INSTRUCTIONS:")
@@ -53,8 +33,13 @@ def main():
     main_panel = Panel(((0, 0), display.get_size()), True, Style(panel_bg_color=(0, 0, 0)))
 
 
-    # Create the main canvas and make it a child of the main panel
-    canvas = Canvas((0, 0, display.get_width(), display.get_height()))
+    # Create brush object
+    brush = Brush()
+
+
+    # Create the main canvas (including telling it which brush object to use)
+    canvas = Canvas((0, 0, display.get_width(), display.get_height()), brush)
+    # Make the main canvas a child of the main panel
     main_panel.add_canvas(canvas)
 
 
@@ -95,37 +80,37 @@ def main():
     main_panel.add_panel(tools_panel)
 
     # Tools panel brush options
-    pixel_button = Button((20, 20, 160, 40), set_brush_pixel, "Pixel")
+    pixel_button = Button((20, 20, 160, 40), brush.set_brush_pixel, "Pixel")
     tools_panel.add_button(pixel_button)
-    brush_button = Button((20, 80, 160, 40), set_brush_brush, "Brush")
+    brush_button = Button((20, 80, 160, 40), brush.set_brush_brush, "Brush")
     tools_panel.add_button(brush_button)
-    circle_button = Button((20, 140, 160, 40), set_brush_circle, "Circle")
+    circle_button = Button((20, 140, 160, 40), brush.set_brush_circle, "Circle")
     tools_panel.add_button(circle_button)
 
     # Tools panel brush size settings and text
     brush_size_title_text = Text("Size", 32, (255, 255, 255), (72, 200))
     tools_panel.add_text(brush_size_title_text)
-    brush_size_text = Text(get_brush_size_text, 32, (255, 255, 255), (90, 230))
+    brush_size_text = Text(brush.get_brush_size_text, 32, (255, 255, 255), (90, 230))
     tools_panel.add_text(brush_size_text)
-    increase_brush_size_button = Button((140, 220, 40, 40), increase_brush_size, "+", Style(button_text_size=48, button_text_padding=(10, 1)))
+    increase_brush_size_button = Button((140, 220, 40, 40), brush.increase_brush_size, "+", Style(button_text_size=48, button_text_padding=(10, 1)))
     tools_panel.add_button(increase_brush_size_button)
-    decrease_brush_size_button = Button((20, 220, 40, 40), decrease_brush_size, "-", Style(button_text_size=48, button_text_padding=(14, 2)))
+    decrease_brush_size_button = Button((20, 220, 40, 40), brush.decrease_brush_size, "-", Style(button_text_size=48, button_text_padding=(14, 2)))
     tools_panel.add_button(decrease_brush_size_button)
 
     # Color selector settings and text
-    brush_color_text = Text("Color", 32, modules.utils.brush_color, (70, 280))
+    brush_color_text = Text("Color", 32, brush.color, (70, 280))
     tools_panel.add_text(brush_color_text)
     brush_rgb_text = Text("R             G             B", 24, (255, 255, 255), (32, 300))
     tools_panel.add_text(brush_rgb_text)
     red_slider = Slider((32, 320), 0, 255, (255, 0, 0))
     tools_panel.add_slider(red_slider)
-    red_slider.percentage = modules.utils.brush_color[0] / 255 # Set default red value
+    red_slider.percentage = brush.color[0] / 255 # Set default red value
     green_slider = Slider((96, 320), 0, 255, (0, 255, 0))
     tools_panel.add_slider(green_slider)
-    green_slider.percentage = modules.utils.brush_color[1] / 255 # Set default green value
+    green_slider.percentage = brush.color[1] / 255 # Set default green value
     blue_slider = Slider((160, 320), 0, 255, (0, 0, 255))
     tools_panel.add_slider(blue_slider)
-    blue_slider.percentage = modules.utils.brush_color[2] / 255 # Set default blue value
+    blue_slider.percentage = brush.color[2] / 255 # Set default blue value
 
 
     # Tools panel toggle visibility button
@@ -214,8 +199,8 @@ def main():
 
 
         # Update brush color
-        modules.utils.brush_color = (red_slider.get_value(), green_slider.get_value(), blue_slider.get_value(), 255)
-        brush_color_text.color = modules.utils.brush_color
+        brush.color = (red_slider.get_value(), green_slider.get_value(), blue_slider.get_value(), 255)
+        brush_color_text.color = brush.color
         
 
         # Rendering
