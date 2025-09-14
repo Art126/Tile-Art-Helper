@@ -1,4 +1,4 @@
-## Tile Art Helper v0.4.5
+## Tile Art Helper v0.4.6
 ## Author: Alexander Art
 
 import math

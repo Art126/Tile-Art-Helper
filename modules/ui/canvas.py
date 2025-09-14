@@ -181,9 +181,9 @@ class Canvas:
             self.scroll[1] %= -scaled_image.get_height()
 
             # Tile and draw the image onto the temporary surface.
-            for y in range(math.ceil(surface.get_height() / self.loaded_image.get_height() / self.zoom) + 2):
-                for x in range(math.ceil(surface.get_width() / self.loaded_image.get_width() / self.zoom) + 2):
-                    temporary_surface.blit(scaled_image, (x * math.floor(self.loaded_image.get_width() * self.zoom) + self.scroll[0], y * math.floor(self.loaded_image.get_height() * self.zoom) + self.scroll[1]))
+            for y in range(math.ceil(surface.get_height() / scaled_image.get_width()) + 1):
+                for x in range(math.ceil(surface.get_width() / scaled_image.get_width()) + 1):
+                    temporary_surface.blit(scaled_image, (x * scaled_image.get_width() + self.scroll[0], y * scaled_image.get_width() + self.scroll[1]))
 
             # Render the temporary surface onto the passed surface.
             surface.blit(temporary_surface, self.get_global_pos())
