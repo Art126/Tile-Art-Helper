@@ -145,6 +145,7 @@ class Canvas:
             print("Error with file format.")
 
     def save_image(self):
+        # Note that this function does not reload the image after saving, unlike the save as function. Maybe this should be changed in the future.
         if self.image_loaded:
             pygame.image.save(self.loaded_image, self.open_filepath)
 
@@ -158,7 +159,7 @@ class Canvas:
             # This will block all mouse clicks until the next time the root has mouse_over() updated (which happens every frame)
             root.mouse_over(False) 
             
-            filepath = filedialog.asksaveasfilename()
+            filepath = filedialog.asksaveasfilename(filetypes=[("PNG", "*.png")], defaultextension='.png')
             try:
                 pygame.image.save(self.loaded_image, filepath)
                 self.loaded_image = pygame.image.load(filepath).convert_alpha()
@@ -181,9 +182,9 @@ class Canvas:
             self.scroll[1] %= -scaled_image.get_height()
 
             # Tile and draw the image onto the temporary surface.
-            for y in range(math.ceil(surface.get_height() / scaled_image.get_width()) + 1):
+            for y in range(math.ceil(surface.get_height() / scaled_image.get_height()) + 1):
                 for x in range(math.ceil(surface.get_width() / scaled_image.get_width()) + 1):
-                    temporary_surface.blit(scaled_image, (x * scaled_image.get_width() + self.scroll[0], y * scaled_image.get_width() + self.scroll[1]))
+                    temporary_surface.blit(scaled_image, (x * scaled_image.get_width() + self.scroll[0], y * scaled_image.get_height() + self.scroll[1]))
 
             # Render the temporary surface onto the passed surface.
             surface.blit(temporary_surface, self.get_global_pos())

@@ -1,4 +1,4 @@
-## Tile Art Helper v0.4.6
+## Tile Art Helper v0.4.7
 ## Author: Alexander Art
 
 import math
@@ -144,6 +144,13 @@ def main():
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     running = False
+                if event.key == pygame.K_o and event.mod & pygame.KMOD_CTRL:
+                    canvas.open_file()
+                if event.key == pygame.K_s and event.mod & pygame.KMOD_CTRL:
+                    if event.mod & pygame.KMOD_SHIFT:
+                        canvas.save_as()
+                    else:
+                        canvas.save_image()
             if event.type == pygame.MOUSEMOTION:
                 main_panel.mouse_moved(event.rel)
             if event.type == pygame.MOUSEBUTTONDOWN:
