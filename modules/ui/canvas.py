@@ -5,6 +5,7 @@ from tkinter import filedialog
 
 import pygame
 
+import modules.settings
 import modules.utils
 
 # Class for canvas UI element
@@ -33,6 +34,9 @@ class Canvas:
 
         # True when the brush is being painted on the canvas.
         self.brush_down = False
+
+        # Have the canvas keep track of its own tiling setting. Updates on render() to detect when modules.settings.tiling_enabled changes.
+        self.tiling_enabled = modules.settings.tiling_enabled
 
     @property
     def size(self):
@@ -177,14 +181,26 @@ class Canvas:
             # This gets laggy when zoomed in due to large image sizes. This should be fixed in future versions.
             scaled_image = pygame.transform.scale(self.loaded_image, (self.loaded_image.get_width() * self.zoom, self.loaded_image.get_height() * self.zoom))
 
-            # Apply the modulo function to the scroll to make the tiled image rendering appear continuous.
-            self.scroll[0] %= -scaled_image.get_width()
-            self.scroll[1] %= -scaled_image.get_height()
+            # Center the image when tiling is disabled
+            if self.tiling_enabled and not modules.settings.tiling_enabled:
+                self.scroll[0] += scaled_image.get_width() * (math.ceil(surface.get_width() / scaled_image.get_width()) // 2 - 1)
+                self.scroll[1] += scaled_image.get_height() * (math.ceil(surface.get_height() / scaled_image.get_height()) // 2 - 1)
+            
+            # Update self.tiling_enabled
+            self.tiling_enabled = modules.settings.tiling_enabled
 
-            # Tile and draw the image onto the temporary surface.
-            for y in range(math.ceil(surface.get_height() / scaled_image.get_height()) + 1):
-                for x in range(math.ceil(surface.get_width() / scaled_image.get_width()) + 1):
-                    temporary_surface.blit(scaled_image, (x * scaled_image.get_width() + self.scroll[0], y * scaled_image.get_height() + self.scroll[1]))
+            if modules.settings.tiling_enabled:
+                # Apply the modulo function to the scroll to make the tiled image rendering appear continuous.
+                self.scroll[0] %= -scaled_image.get_width()
+                self.scroll[1] %= -scaled_image.get_height()
+                
+                # Tile and draw the image onto the temporary surface.
+                for y in range(math.ceil(surface.get_height() / scaled_image.get_height()) + 1):
+                    for x in range(math.ceil(surface.get_width() / scaled_image.get_width()) + 1):
+                        temporary_surface.blit(scaled_image, (x * scaled_image.get_width() + self.scroll[0], y * scaled_image.get_height() + self.scroll[1]))
+            else:
+                # Render the image without tiling it
+                temporary_surface.blit(scaled_image, (scaled_image.get_width() + self.scroll[0], scaled_image.get_height() + self.scroll[1]))
 
             # Render the temporary surface onto the passed surface.
             surface.blit(temporary_surface, self.get_global_pos())

@@ -1,10 +1,11 @@
-## Tile Art Helper v0.4.7
+## Tile Art Helper v0.5.0
 ## Author: Alexander Art
 
 import math
 
 import pygame
 
+import modules.settings
 from modules.brush import Brush
 from modules.ui.ui_style import Style
 from modules.ui.panel import Panel
@@ -116,6 +117,11 @@ def main():
     # Tools panel toggle visibility button
     toggle_brush_tools_button = Button((display.get_width() - 164, 4, 160, 40), tools_panel.toggle_visibility, "Brush tools")
     top_panel.add_button(toggle_brush_tools_button)
+
+
+    # Toggle tiling button
+    toggle_tiling_button = Button((display.get_width() - 328, 4, 160, 40), modules.settings.toggle_tiling, "Toggle tiling")
+    top_panel.add_button(toggle_tiling_button)
 
 
     # Frame loop (repeats every frame the program is open)
