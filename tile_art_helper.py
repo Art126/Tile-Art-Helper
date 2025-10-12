@@ -1,4 +1,4 @@
-## Tile Art Helper v0.5.0
+## Tile Art Helper v0.5.1
 ## Author: Alexander Art
 
 import math
@@ -26,7 +26,8 @@ def main():
 
     # Initialize pygame
     pygame.init()
-    pygame.display.set_caption("Tile Art Helper")
+    window_caption = "Tile Art Helper"
+    pygame.display.set_caption(window_caption)
     display = pygame.display.set_mode((1280, 720), pygame.RESIZABLE)
 
 
@@ -214,6 +215,15 @@ def main():
         # Update brush color
         brush.color = (red_slider.get_value(), green_slider.get_value(), blue_slider.get_value(), 255)
         brush_color_text.color = brush.color
+
+
+        # If there is unsaved progress, update the window caption to reflect that
+        if (window_caption == "Tile Art Helper" and canvas.image_unsaved):
+            window_caption = "*Tile Art Helper"
+            pygame.display.set_caption(window_caption)
+        elif (window_caption == "*Tile Art Helper" and not canvas.image_unsaved):
+            window_caption = "Tile Art Helper"
+            pygame.display.set_caption(window_caption)
         
 
         # Rendering

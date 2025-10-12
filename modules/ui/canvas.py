@@ -31,6 +31,7 @@ class Canvas:
         self.loaded_image = None
         self.open_filepath = None
         self.image_loaded = False
+        self.image_unsaved = False # When True, an asterisk is added to the window caption ("Tile Art Helper" to "*Tile Art Helper")
 
         # True when the brush is being painted on the canvas.
         self.brush_down = False
@@ -152,6 +153,7 @@ class Canvas:
         # Note that this function does not reload the image after saving, unlike the save as function. Maybe this should be changed in the future.
         if self.image_loaded:
             pygame.image.save(self.loaded_image, self.open_filepath)
+            self.image_unsaved = False
 
     def save_as(self):
         if self.image_loaded:
@@ -168,6 +170,7 @@ class Canvas:
                 pygame.image.save(self.loaded_image, filepath)
                 self.loaded_image = pygame.image.load(filepath).convert_alpha()
                 self.open_filepath = filepath
+                self.image_unsaved = False
             except pygame.error:
                 print(f"Invalid file format. Try '.png'")
 
@@ -221,6 +224,9 @@ class Canvas:
 
         # If an image is loaded and the brush is down, paint between the current position and the previous position
         if self.image_loaded and self.brush_down:
+            # Brush was used, so the image has unsaved progress
+            self.image_unsaved = True
+            
             # Paint along the line the mouse moved
             for i in range(max(1, int(mouse_move_distance / spacing))):
                 center_pos_x = int((mouse_pos[0] - i * space[0] - self.scroll[0]) % (math.floor(self.loaded_image.get_width() * self.zoom)) / self.zoom)
@@ -259,6 +265,9 @@ class Canvas:
 
             # If an image is loaded, paint at the mouse position
             if self.image_loaded:
+                # Brush was used, so the image has unsaved progress
+                self.image_unsaved = True
+
                 # Calculate the pixel position on the canvas where the mouse is
                 center_pos_x = int((mouse_pos[0] - self.scroll[0]) % (math.floor(self.loaded_image.get_width() * self.zoom)) / self.zoom)
                 center_pos_y = int((mouse_pos[1] - self.scroll[1]) % (math.floor(self.loaded_image.get_height() * self.zoom)) / self.zoom)
