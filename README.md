@@ -9,7 +9,8 @@ This program is in early development. Its purpose is to assist in drawing tile t
 3. Run `tile_art_helper.py`
 
 ### Instructions
-Once the program is running, open an image using the "Open Image" button.
+Once the program is running, an image can be opened with Ctrl+O or the "Open Image" button.
+
 Once an image is open, you can edit the file:
 - Left click to paint
 - Middle click to use the color picker
