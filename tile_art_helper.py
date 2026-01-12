@@ -1,4 +1,4 @@
-## Tile Art Helper v0.5.1
+## Tile Art Helper v0.6.0
 ## Author: Alexander Art
 
 import math
@@ -52,11 +52,11 @@ def main():
     # Top panel save options
     open_image_button = Button((4, 4, 160, 40), canvas.open_file, "Open Image")
     top_panel.add_button(open_image_button)
-    save_overwrite_button = Button((204, 4, 160, 40), canvas.save_image, "Save")
+    save_overwrite_button = Button((168, 4, 160, 40), canvas.save_image, "Save")
     top_panel.add_button(save_overwrite_button)
-    save_overwrite_text = Text("Will overwrite previous!", 20, (255, 255, 255), (208, 45))
+    save_overwrite_text = Text("Will overwrite previous!", 20, (255, 255, 255), (172, 45))
     top_panel.add_text(save_overwrite_text)
-    save_as_button = Button((404, 4, 160, 40), canvas.save_as, "Save As")
+    save_as_button = Button((332, 4, 160, 40), canvas.save_as, "Save As")
     top_panel.add_button(save_as_button)
 
     
@@ -125,6 +125,37 @@ def main():
     top_panel.add_button(toggle_tiling_button)
 
 
+    # Create resize panel, make it a child of the main panel, and have it closed by default
+    resize_panel = Panel((display.get_width() / 2 - 100, display.get_height() / 2 - 100, 200, 200), False).set_caption("Resize tile")
+    main_panel.add_panel(resize_panel)
+    resize_panel.toggle_visibility()
+
+    # Resize panel size settings
+    resize_width_title_text = Text("Width", 32, (255, 255, 255), (72, 10))
+    resize_panel.add_text(resize_width_title_text)
+    resize_width_text = Text(modules.settings.get_resize_width_text, 32, (255, 255, 255), (90, 40))
+    resize_panel.add_text(resize_width_text)
+    increase_resize_width_button = Button((140, 30, 40, 40), modules.settings.increase_resize_width, "+", Style(button_text_size=48, button_text_padding=(10, 1)))
+    resize_panel.add_button(increase_resize_width_button)
+    decrease_resize_width_button = Button((20, 30, 40, 40), modules.settings.decrease_resize_width, "-", Style(button_text_size=48, button_text_padding=(14, 2)))
+    resize_panel.add_button(decrease_resize_width_button)
+    resize_height_title_text = Text("Height", 32, (255, 255, 255), (64, 80))
+    resize_panel.add_text(resize_height_title_text)
+    resize_height_text = Text(modules.settings.get_resize_height_text, 32, (255, 255, 255), (90, 110))
+    resize_panel.add_text(resize_height_text)
+    increase_resize_height_button = Button((140, 100, 40, 40), modules.settings.increase_resize_height, "+", Style(button_text_size=48, button_text_padding=(10, 1)))
+    resize_panel.add_button(increase_resize_height_button)
+    decrease_resize_height_button = Button((20, 100, 40, 40), modules.settings.decrease_resize_height, "-", Style(button_text_size=48, button_text_padding=(14, 2)))
+    resize_panel.add_button(decrease_resize_height_button)
+    resize_apply_button = Button((59, 150, 82, 40), canvas.apply_resize, "Apply")
+    resize_panel.add_button(resize_apply_button)
+    
+
+    # Resize button
+    resize_button = Button((display.get_width() - 492, 4, 160, 40), resize_panel.toggle_visibility, "Resize")
+    top_panel.add_button(resize_button)
+
+
     # Frame loop (repeats every frame the program is open)
 
     running = True
@@ -146,8 +177,11 @@ def main():
                 increment_zoom_button.local_x = display.get_width() - 60
                 decrement_zoom_button.local_x = display.get_width() - 190
                 toggle_brush_tools_button.local_x = display.get_width() - 164
+                toggle_tiling_button.local_x = display.get_width() - 328
+                resize_button.local_x = display.get_width() - 492
 
                 tools_panel.keep_on_screen()
+                resize_panel.keep_on_screen()
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     running = False
@@ -224,6 +258,13 @@ def main():
         elif (window_caption == "*Tile Art Helper" and not canvas.image_unsaved):
             window_caption = "Tile Art Helper"
             pygame.display.set_caption(window_caption)
+
+
+        # The resize text should match the loaded image size when the resize panel is opened
+        # To do this, the text is always updated when the resize panel is closed
+        if canvas.image_loaded and not resize_panel.visible:
+            modules.settings.resize_width = canvas.loaded_image.get_width()
+            modules.settings.resize_height = canvas.loaded_image.get_height()
         
 
         # Rendering

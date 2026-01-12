@@ -143,6 +143,8 @@ class Canvas:
         try:
             self.loaded_image = pygame.image.load(filepath).convert_alpha()
             self.open_filepath = filepath
+            modules.settings.resize_width = self.loaded_image.get_width()
+            modules.settings.resize_height = self.loaded_image.get_height()
             self.image_loaded = True
         except FileNotFoundError:
             print("File not found.")
@@ -173,6 +175,11 @@ class Canvas:
                 self.image_unsaved = False
             except pygame.error:
                 print(f"Invalid file format. Try '.png'")
+
+    def apply_resize(self):
+        # Set the size of the loaded image to the new size from modules.settings
+        if self.image_loaded:
+            self.loaded_image = pygame.transform.scale(self.loaded_image, (modules.settings.resize_width, modules.settings.resize_height))
 
     def render(self, surface):
         # Render and tile the loaded image onto the passed surface.
