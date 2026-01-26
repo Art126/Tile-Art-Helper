@@ -1,4 +1,4 @@
-## Tile Art Helper v0.6.0
+## Tile Art Helper v0.6.1
 ## Author: Alexander Art
 
 import math
@@ -13,6 +13,7 @@ from modules.ui.canvas import Canvas
 from modules.ui.button import Button
 from modules.ui.text import Text
 from modules.ui.slider import Slider
+from modules.ui.textbox import Textbox
 
 def main():
     print("INSTRUCTIONS:")
@@ -133,16 +134,16 @@ def main():
     # Resize panel size settings
     resize_width_title_text = Text("Width", 32, (255, 255, 255), (72, 10))
     resize_panel.add_text(resize_width_title_text)
-    resize_width_text = Text(modules.settings.get_resize_width_text, 32, (255, 255, 255), (90, 40))
-    resize_panel.add_text(resize_width_text)
+    resize_width_textbox = Textbox((65, 30, 70, 40), modules.settings.get_resize_width_text(), modules.settings.set_resize_width)
+    resize_panel.add_textbox(resize_width_textbox)
     increase_resize_width_button = Button((140, 30, 40, 40), modules.settings.increase_resize_width, "+", Style(button_text_size=48, button_text_padding=(10, 1)))
     resize_panel.add_button(increase_resize_width_button)
     decrease_resize_width_button = Button((20, 30, 40, 40), modules.settings.decrease_resize_width, "-", Style(button_text_size=48, button_text_padding=(14, 2)))
     resize_panel.add_button(decrease_resize_width_button)
     resize_height_title_text = Text("Height", 32, (255, 255, 255), (64, 80))
     resize_panel.add_text(resize_height_title_text)
-    resize_height_text = Text(modules.settings.get_resize_height_text, 32, (255, 255, 255), (90, 110))
-    resize_panel.add_text(resize_height_text)
+    resize_height_textbox = Textbox((65, 100, 70, 40), modules.settings.get_resize_height_text(), modules.settings.set_resize_height)
+    resize_panel.add_textbox(resize_height_textbox)
     increase_resize_height_button = Button((140, 100, 40, 40), modules.settings.increase_resize_height, "+", Style(button_text_size=48, button_text_padding=(10, 1)))
     resize_panel.add_button(increase_resize_height_button)
     decrease_resize_height_button = Button((20, 100, 40, 40), modules.settings.decrease_resize_height, "-", Style(button_text_size=48, button_text_padding=(14, 2)))
@@ -192,6 +193,8 @@ def main():
                         canvas.save_as()
                     else:
                         canvas.save_image()
+                if not event.mod & pygame.KMOD_CTRL:
+                    main_panel.key_down(event.key, event.unicode)
             if event.type == pygame.MOUSEMOTION:
                 main_panel.mouse_moved(event.rel)
             if event.type == pygame.MOUSEBUTTONDOWN:
@@ -259,12 +262,18 @@ def main():
             window_caption = "Tile Art Helper"
             pygame.display.set_caption(window_caption)
 
-
+            
         # The resize text should match the loaded image size when the resize panel is opened
         # To do this, the text is always updated when the resize panel is closed
         if canvas.image_loaded and not resize_panel.visible:
             modules.settings.resize_width = canvas.loaded_image.get_width()
             modules.settings.resize_height = canvas.loaded_image.get_height()
+
+        # The resize textbox should display the resize settings when not being typed in
+        if not resize_width_textbox.active:
+            resize_width_textbox.text = modules.settings.get_resize_width_text()
+        if not resize_height_textbox.active:
+            resize_height_textbox.text = modules.settings.get_resize_height_text()
         
 
         # Rendering

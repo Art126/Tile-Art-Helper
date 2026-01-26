@@ -41,6 +41,7 @@ class Panel:
         self.canvases = [] # Needing several canvases is rare.
         self.buttons = []
         self.sliders = []
+        self.textboxes = []
         self.text = []
 
         if self.fixed:
@@ -158,6 +159,11 @@ class Panel:
         slider.parent = self
         return self
 
+    def add_textbox(self, textbox):
+        self.textboxes.append(textbox)
+        textbox.parent = self
+        return self
+
     def add_text(self, text):
         self.text.append(text)
         text.parent = self
@@ -216,6 +222,10 @@ class Panel:
         # Render child sliders
         for slider in self.sliders:
             slider.render(surface)
+
+        # Render child textboxes
+        for textbox in self.textboxes:
+            textbox.render(surface)
             
         # Render child text
         for text in self.text:
@@ -229,7 +239,7 @@ class Panel:
         self.is_hovered = hovered
 
         # Pass mouse hover to only the top UI element that the mouse is over
-        # Layer order, sequentially up the list of each: panels, buttons, sliders, canvases
+        # Layer order, sequentially up the list of each: panels, buttons, sliders, textboxes, canvases
         element_found = False
         for index, panel in enumerate(reversed(self.panels)):
             if self.is_hovered and panel.get_global_bounding_rect().collidepoint(pygame.mouse.get_pos()) and not element_found:
@@ -249,6 +259,12 @@ class Panel:
                 element_found = True
             else:
                 slider.mouse_over(False)
+        for index, textbox in enumerate(reversed(self.textboxes)):
+            if self.is_hovered and textbox.get_global_bounding_rect().collidepoint(pygame.mouse.get_pos()) and not element_found:
+                textbox.mouse_over(True)
+                element_found = True
+            else:
+                textbox.mouse_over(False)
         for index, canvas in enumerate(reversed(self.canvases)):
             if self.is_hovered and canvas.get_global_bounding_rect().collidepoint(pygame.mouse.get_pos()) and not element_found:
                 canvas.mouse_over(True)
@@ -301,6 +317,10 @@ class Panel:
         for canvas in self.canvases[:]:
             canvas.left_mouse_down()
 
+        # Pass mouse press to child textboxes
+        for textbox in self.textboxes[:]:
+            textbox.left_mouse_down()
+
         # Pass mouse press to child buttons
         for button in self.buttons[:]:
             button.left_mouse_down()
@@ -328,3 +348,14 @@ class Panel:
         # Pass mouse up to child sliders
         for slider in self.sliders:
             slider.left_mouse_up()
+
+    def key_down(self, key, unicode):
+        # This function runs on the keydown event when CTRL is not pressed.
+
+        # Pass key down to child panels
+        for panel in self.panels:
+            panel.key_down(key, unicode)
+
+        # Pass key down to child textboxes
+        for textbox in self.textboxes:
+            textbox.key_down(key, unicode)

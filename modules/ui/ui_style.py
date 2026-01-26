@@ -13,7 +13,13 @@ class Style:
                  button_default_text_color=(255, 255, 255),
                  button_hovered_text_color=(255, 255, 255),
                  button_text_size=32,
-                 button_text_padding=(9, 9)):
+                 button_text_padding=(9, 9),
+                 textbox_bg_color=(0, 0, 0),
+                 textbox_text_color=(255, 255, 255),
+                 textbox_text_size=32,
+                 textbox_text_padding=(9, 9),
+                 textbox_cursor_color=(255, 255, 255),
+                 textbox_cursor_width=2):
         self.panel_bg_color = panel_bg_color
         self.panel_title_bar_color = panel_title_bar_color
         self.panel_title_bar_text_color = panel_title_bar_text_color
@@ -25,3 +31,9 @@ class Style:
         self.button_hovered_text_color = button_hovered_text_color
         self.button_text_size = button_text_size
         self.button_text_padding = button_text_padding
+        self.textbox_bg_color = textbox_bg_color
+        self.textbox_text_color = textbox_text_color
+        self.textbox_text_size = button_text_size
+        self.textbox_text_padding = button_text_padding
+        self.textbox_cursor_color = textbox_cursor_color
+        self.textbox_cursor_width = textbox_cursor_width
