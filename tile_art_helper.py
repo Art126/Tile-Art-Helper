@@ -1,4 +1,4 @@
-## Tile Art Helper v0.6.1
+## Tile Art Helper v0.6.2
 ## Author: Alexander Art
 
 import math
@@ -79,7 +79,7 @@ def main():
 
 
     # Create tools panel and make it a child of the main panel
-    tools_panel = Panel((display.get_width() - 220, 100, 200, 400), False).set_caption("Brush tools")
+    tools_panel = Panel((display.get_width() - 220, 100, 200, 440), False).set_caption("Brush tools")
     main_panel.add_panel(tools_panel)
 
     # Tools panel brush options
@@ -91,10 +91,10 @@ def main():
     tools_panel.add_button(circle_button)
 
     # Tools panel brush size settings and text
-    brush_size_title_text = Text("Size", 32, (255, 255, 255), (72, 200))
+    brush_size_title_text = Text("Size", 32, (255, 255, 255), (72, 198))
     tools_panel.add_text(brush_size_title_text)
-    brush_size_text = Text(brush.get_brush_size_text, 32, (255, 255, 255), (90, 230))
-    tools_panel.add_text(brush_size_text)
+    brush_size_textbox = Textbox((65, 220, 70, 40), brush.get_brush_size_text(), brush.set_brush_size)
+    tools_panel.add_textbox(brush_size_textbox)
     increase_brush_size_button = Button((140, 220, 40, 40), brush.increase_brush_size, "+", Style(button_text_size=48, button_text_padding=(10, 1)))
     tools_panel.add_button(increase_brush_size_button)
     decrease_brush_size_button = Button((20, 220, 40, 40), brush.decrease_brush_size, "-", Style(button_text_size=48, button_text_padding=(14, 2)))
@@ -105,15 +105,21 @@ def main():
     tools_panel.add_text(brush_color_text)
     brush_rgb_text = Text("R             G             B", 24, (255, 255, 255), (32, 300))
     tools_panel.add_text(brush_rgb_text)
-    red_slider = Slider((32, 320), 0, 255, (255, 0, 0))
+    red_slider = Slider((32, 320), 0, 255, brush.set_red, (255, 0, 0))
     tools_panel.add_slider(red_slider)
-    red_slider.percentage = brush.color[0] / 255 # Set default red value
-    green_slider = Slider((96, 320), 0, 255, (0, 255, 0))
+    red_slider.percentage = brush.color[0] / 255 # Set slider red value to default
+    red_textbox = Textbox((12, 390, 48, 34), str(brush.color[0]), brush.set_red, Style(textbox_text_size=24))
+    tools_panel.add_textbox(red_textbox)
+    green_slider = Slider((96, 320), 0, 255, brush.set_green, (0, 255, 0))
     tools_panel.add_slider(green_slider)
-    green_slider.percentage = brush.color[1] / 255 # Set default green value
-    blue_slider = Slider((160, 320), 0, 255, (0, 0, 255))
+    green_slider.percentage = brush.color[1] / 255 # Set slider green value to default
+    green_textbox = Textbox((77, 390, 48, 34), str(brush.color[1]), brush.set_green, Style(textbox_text_size=24))
+    tools_panel.add_textbox(green_textbox)
+    blue_slider = Slider((160, 320), 0, 255, brush.set_blue, (0, 0, 255))
     tools_panel.add_slider(blue_slider)
-    blue_slider.percentage = brush.color[2] / 255 # Set default blue value
+    blue_slider.percentage = brush.color[2] / 255 # Set slider blue value to default
+    blue_textbox = Textbox((142, 390, 48, 34), str(brush.color[2]), brush.set_blue, Style(textbox_text_size=24))
+    tools_panel.add_textbox(blue_textbox)
 
 
     # Tools panel toggle visibility button
@@ -132,7 +138,7 @@ def main():
     resize_panel.toggle_visibility()
 
     # Resize panel size settings
-    resize_width_title_text = Text("Width", 32, (255, 255, 255), (72, 10))
+    resize_width_title_text = Text("Width", 32, (255, 255, 255), (68, 10))
     resize_panel.add_text(resize_width_title_text)
     resize_width_textbox = Textbox((65, 30, 70, 40), modules.settings.get_resize_width_text(), modules.settings.set_resize_width)
     resize_panel.add_textbox(resize_width_textbox)
@@ -203,10 +209,7 @@ def main():
                 if event.button == 2:
                     if canvas.image_loaded:
                         # Pick the color at the mouse position (alpha not yet supported)
-                        new_color = canvas.loaded_image.get_at((int((event.pos[0] - canvas.scroll[0]) % math.floor(canvas.loaded_image.get_width() * canvas.zoom) / canvas.zoom), int((event.pos[1] - canvas.scroll[1]) % math.floor(canvas.loaded_image.get_height() * canvas.zoom) / canvas.zoom)))
-                        red_slider.percentage = new_color[0] / 255
-                        green_slider.percentage = new_color[1] / 255
-                        blue_slider.percentage = new_color[2] / 255
+                        brush.color = canvas.loaded_image.get_at((int((event.pos[0] - canvas.scroll[0]) % math.floor(canvas.loaded_image.get_width() * canvas.zoom) / canvas.zoom), int((event.pos[1] - canvas.scroll[1]) % math.floor(canvas.loaded_image.get_height() * canvas.zoom) / canvas.zoom)))
             if event.type == pygame.MOUSEBUTTONUP:
                 if event.button == 1:
                     main_panel.left_mouse_up()
@@ -249,10 +252,15 @@ def main():
         previous_mouse_pos = pygame.mouse.get_pos() # pygame.mouse.get_rel() does not take into account pygame.SCALED
 
 
-        # Update brush color
-        brush.color = (red_slider.get_value(), green_slider.get_value(), blue_slider.get_value(), 255)
+        # Update brush color text
         brush_color_text.color = brush.color
 
+        # Update sliders to match brush color
+        # This is necessary when the brush color is changed by something other than the sliders
+        red_slider.percentage = brush.color[0] / 255
+        green_slider.percentage = brush.color[1] / 255
+        blue_slider.percentage = brush.color[2] / 255
+        
 
         # If there is unsaved progress, update the window caption to reflect that
         if (window_caption == "Tile Art Helper" and canvas.image_unsaved):
@@ -274,6 +282,17 @@ def main():
             resize_width_textbox.text = modules.settings.get_resize_width_text()
         if not resize_height_textbox.active:
             resize_height_textbox.text = modules.settings.get_resize_height_text()
+
+
+        # The brush textboxes should display the brush settings when not being typed in
+        if not brush_size_textbox.active:
+            brush_size_textbox.text = brush.get_brush_size_text()
+        if not red_textbox.active:
+            red_textbox.text = str(brush.color[0])
+        if not green_textbox.active:
+            green_textbox.text = str(brush.color[1])
+        if not blue_textbox.active:
+            blue_textbox.text = str(brush.color[2])
         
 
         # Rendering

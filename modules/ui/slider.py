@@ -4,7 +4,7 @@ import pygame
 
 # Class for slider UI elements
 class Slider:
-    def __init__(self, pos, min_value, max_value, color=(0, 0, 0)):
+    def __init__(self, pos, min_value, max_value, action=None, color=(0, 0, 0)):
         # This slider's parent object. This gets set with parent.add_slider(self).
         # If the parent is a pygame surface instead of a panel, self.parent should remain None and self.render() must be called explicitly.
         self.parent = None
@@ -12,6 +12,7 @@ class Slider:
         self.pos = pos
         self.min_value = min_value
         self.max_value = max_value
+        self.action = action # Function to run when the slider is used with the changed value
         self.color = color
 
         self.percentage = 0
@@ -92,7 +93,12 @@ class Slider:
         mouse_pos = (pygame.mouse.get_pos()[0] - self.global_x, pygame.mouse.get_pos()[1] - self.global_y)
         
         if self.is_held:
+            # Update percentage based on mouse position
             self.percentage = min(max(0, 1 - (mouse_pos[1] - 3) / (self.height - 6)), 1)
+
+            # If this slider has a function, run it with the updated value
+            if self.action is not None:
+                self.action(self.get_value())
 
     def left_mouse_down(self):
         # If the slider was clicked
@@ -107,7 +113,12 @@ class Slider:
             # Mouse position relative to the top left corner of the slider
             mouse_pos = (pygame.mouse.get_pos()[0] - self.global_x, pygame.mouse.get_pos()[1] - self.global_y)
             
+            # Update percentage based on mouse position
             self.percentage = min(max(0, 1 - (mouse_pos[1] - 3) / (self.height - 6)), 1)
+
+            # If this slider has a function, run it with the updated value
+            if self.action is not None:
+                self.action(self.get_value())
 
     def left_mouse_up(self):
         self.is_held = False

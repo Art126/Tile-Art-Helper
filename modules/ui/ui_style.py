@@ -33,7 +33,7 @@ class Style:
         self.button_text_padding = button_text_padding
         self.textbox_bg_color = textbox_bg_color
         self.textbox_text_color = textbox_text_color
-        self.textbox_text_size = button_text_size
-        self.textbox_text_padding = button_text_padding
+        self.textbox_text_size = textbox_text_size
+        self.textbox_text_padding = textbox_text_padding
         self.textbox_cursor_color = textbox_cursor_color
         self.textbox_cursor_width = textbox_cursor_width

@@ -127,16 +127,18 @@ class Textbox:
         # If this textbox is clicked out of, exit it and run its function.
         if not self.is_hovered and self.active:
             self.active = False
-            self.action(self.text)
+            if self.action is not None:
+                self.action(self.text)
 
     def key_down(self, key, unicode):
-        # This function runs on the keydown event when CTRL is not pressed.
+        # This function runs on the keydown event, excluding when CTRL is pressed.
 
         if self.active:
             if key == pygame.K_RETURN:
                 # Exit textbox and run its function when enter is pressed
                 self.active = False
-                self.action(self.text)
+                if self.action is not None:
+                    self.action(self.text)
             elif key == pygame.K_BACKSPACE or key == pygame.K_DELETE:
                 # Delete last character
                 self.text = self.text[:-1]

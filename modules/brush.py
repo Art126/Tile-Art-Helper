@@ -20,6 +20,13 @@ class Brush:
         # Set brush shape to circle
         self.shape = 'circle'
 
+    def set_brush_size(self, size):
+        try:
+            if int(size) > 0:
+                self.size = int(size)
+        except ValueError:
+            pass
+
     def increase_brush_size(self):
         self.size += 1
 
@@ -29,3 +36,31 @@ class Brush:
     
     def get_brush_size_text(self):
         return str(self.size)
+
+    def set_red(self, red):
+        try:
+            if 0 <= int(red) <= 255:
+                self.color = (int(red), self.color[1], self.color[2], self.color[3])
+        except ValueError:
+            pass
+
+    def set_green(self, green):
+        try:
+            if 0 <= int(green) <= 255:
+                self.color = (self.color[0], int(green), self.color[2], self.color[3])
+        except ValueError:
+            pass
+
+    def set_blue(self, blue):
+        try:
+            if 0 <= int(blue) <= 255:
+                self.color = (self.color[0], self.color[1], int(blue), self.color[3])
+        except ValueError:
+            pass
+
+    def set_alpha(self, alpha):
+        try:
+            if 0 <= int(alpha) <= 255:
+                self.color = (self.color[0], self.color[1], self.color[2], int(alpha))
+        except ValueError:
+            pass
